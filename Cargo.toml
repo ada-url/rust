@@ -1,8 +1,16 @@
 [package]
-name = "ada-rust"
+name = "ada-url"
+authors = ["Yagiz Nizipli <yagiz@nizipli.com>", "Daniel Lemire <daniel@lemire.me>"]
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Fast WHATWG Compliant URL parser"
+readme = "README.md"
+repository = "https://github.com/ada-url/rust"
+license = "MIT AND APACHE-2.0"
+exclude = [".github"]
 
 [dependencies]
+cxx = "1.0"
+
+[build-dependencies]
+cxx-build = "1.0"

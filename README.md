@@ -1,0 +1,2 @@
+## Rust bindings for Ada
+
