@@ -9,7 +9,8 @@ fn main() {
     build
         .file("./deps/ada.cpp")
         .include("./deps/ada.h")
-        .include("./deps/ada_c.h");
+        .include("./deps/ada_c.h")
+        .cpp(true);
 
     let compile_target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS");
     let compile_target_env = env::var("CARGO_CFG_TARGET_ENV").expect("CARGO_CFG_TARGET_ENV");
