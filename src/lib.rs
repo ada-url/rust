@@ -157,44 +157,99 @@ impl Url {
         }
     }
 
+    pub fn set_origin<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_origin(self.url, input_with_0_terminate.as_ptr()) }
+    }
+
     pub fn href(&self) -> &str {
         unsafe { ffi::ada_get_href(self.url) }.as_str()
+    }
+
+    pub fn set_href<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_href(self.url, input_with_0_terminate.as_ptr()) }
     }
 
     pub fn username(&self) -> &str {
         unsafe { ffi::ada_get_username(self.url) }.as_str()
     }
 
+    pub fn set_username<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_username(self.url, input_with_0_terminate.as_ptr()) }
+    }
+
     pub fn password(&self) -> &str {
         unsafe { ffi::ada_get_password(self.url) }.as_str()
+    }
+
+    pub fn set_password<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_password(self.url, input_with_0_terminate.as_ptr()) }
     }
 
     pub fn port(&self) -> &str {
         unsafe { ffi::ada_get_port(self.url) }.as_str()
     }
 
+    pub fn set_port<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_port(self.url, input_with_0_terminate.as_ptr()) }
+    }
+
     pub fn hash(&self) -> &str {
         unsafe { ffi::ada_get_hash(self.url) }.as_str()
+    }
+
+    pub fn set_hash<U: AsRef<str>>(&mut self, input: U) {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_hash(self.url, input_with_0_terminate.as_ptr()) }
     }
 
     pub fn host(&self) -> &str {
         unsafe { ffi::ada_get_host(self.url) }.as_str()
     }
 
+    pub fn set_host<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_host(self.url, input_with_0_terminate.as_ptr()) }
+    }
+
     pub fn hostname(&self) -> &str {
         unsafe { ffi::ada_get_hostname(self.url) }.as_str()
+    }
+
+    pub fn set_hostname<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_hostname(self.url, input_with_0_terminate.as_ptr()) }
     }
 
     pub fn pathname(&self) -> &str {
         unsafe { ffi::ada_get_pathname(self.url) }.as_str()
     }
 
+    pub fn set_pathname<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_pathname(self.url, input_with_0_terminate.as_ptr()) }
+    }
+
     pub fn search(&self) -> &str {
         unsafe { ffi::ada_get_search(self.url) }.as_str()
     }
 
+    pub fn set_search<U: AsRef<str>>(&mut self, input: U) {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_search(self.url, input_with_0_terminate.as_ptr()) }
+    }
+
     pub fn protocol(&self) -> &str {
         unsafe { ffi::ada_get_protocol(self.url) }.as_str()
+    }
+
+    pub fn set_protocol<U: AsRef<str>>(&mut self, input: U) -> bool {
+        let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
+        unsafe { ffi::ada_set_protocol(self.url, input_with_0_terminate.as_ptr()) }
     }
 }
 
@@ -211,15 +266,33 @@ mod test {
             out.href(),
             "https://username:password@google.com:9090/search?query#hash"
         );
-        assert_eq!(out.username(), "username");
-        assert_eq!(out.password(), "password");
-        assert_eq!(out.port(), "9090");
-        assert_eq!(out.hash(), "#hash");
-        assert_eq!(out.host(), "google.com:9090");
-        assert_eq!(out.hostname(), "google.com");
-        assert_eq!(out.pathname(), "/search");
-        assert_eq!(out.search(), "?query");
-        assert_eq!(out.protocol(), "https:");
+
+        assert!(out.set_username("new-username"));
+        assert_eq!(out.username(), "new-username");
+
+        assert!(out.set_password("new-password"));
+        assert_eq!(out.password(), "new-password");
+
+        assert!(out.set_port("4242"));
+        assert_eq!(out.port(), "4242");
+
+        out.set_hash("#new-hash");
+        assert_eq!(out.hash(), "#new-hash");
+
+        assert!(out.set_host("yagiz.co:9999"));
+        assert_eq!(out.host(), "yagiz.co:9999");
+
+        assert!(out.set_hostname("domain.com"));
+        assert_eq!(out.hostname(), "domain.com");
+
+        assert!(out.set_pathname("/new-search"));
+        assert_eq!(out.pathname(), "/new-search");
+
+        out.set_search("updated-query");
+        assert_eq!(out.search(), "?updated-query");
+
+        out.set_protocol("wss");
+        assert_eq!(out.protocol(), "wss:");
     }
 
     #[test]
