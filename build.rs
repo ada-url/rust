@@ -8,7 +8,7 @@ fn main() {
     let mut build = cc::Build::new();
     build
         .file("./deps/ada.cpp")
-        .file("./deps/ada.h")
+        .include("./deps/ada.h")
         .include("./deps/ada_c.h");
 
     let compile_target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS");

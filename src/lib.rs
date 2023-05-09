@@ -1,4 +1,5 @@
 use std::ptr;
+
 use thiserror::Error;
 
 pub mod ffi {
@@ -16,8 +17,8 @@ pub mod ffi {
         pub length: usize,
     }
 
-    impl AsRef<str> for ada_string {
-        fn as_ref(&self) -> &str {
+    impl ada_string {
+        pub fn as_str(self) -> &'static str {
             unsafe {
                 let slice = std::slice::from_raw_parts(self.data.cast(), self.length);
                 std::str::from_utf8_unchecked(slice)
@@ -61,7 +62,7 @@ pub mod ffi {
         pub fn ada_get_url_components(url: *mut ada_url) -> ada_url_components;
 
         // Getters
-        pub fn ada_get_origin(url: *mut ada_url) -> ada_owned_string;
+        pub fn ada_get_origin(url: *mut ada_url) -> *mut ada_owned_string;
         pub fn ada_get_href(url: *mut ada_url) -> ada_string;
         pub fn ada_get_username(url: *mut ada_url) -> ada_string;
         pub fn ada_get_password(url: *mut ada_url) -> ada_string;
@@ -112,10 +113,12 @@ pub struct Url {
 
 impl Drop for Url {
     fn drop(&mut self) {
-        unsafe {
-            if let Some(origin) = self.origin {
+        if let Some(origin) = self.origin {
+            unsafe {
                 ffi::ada_free_owned_string(origin);
             }
+        }
+        unsafe {
             ffi::ada_free(self.url);
         }
     }
@@ -126,62 +129,63 @@ impl Url {
         unsafe {
             ffi::ada_can_parse(
                 input.as_ptr().cast(),
-                base.unwrap_or_else(ptr::null()).as_ptr().cast(),
+                base.map(|b| b.as_ptr()).unwrap_or(ptr::null_mut()).cast(),
             )
         }
     }
 
     pub fn origin(&mut self) -> &str {
         unsafe {
-            self.origin = ffi::ada_get_origin(self.url);
-            return self.origin.as_ref();
+            self.origin = Some(ffi::ada_get_origin(self.url));
+            self.origin.map(|o| (*o).as_ref()).unwrap_or("")
         }
     }
 
     pub fn href(&self) -> &str {
-        unsafe { ffi::ada_get_href(self.url).as_ref() }
+        unsafe { ffi::ada_get_href(self.url) }.as_str()
     }
 
     pub fn username(&self) -> &str {
-        unsafe { ffi::ada_get_username(self.url).as_ref() }
+        unsafe { ffi::ada_get_username(self.url) }.as_str()
     }
 
     pub fn password(&self) -> &str {
-        unsafe { ffi::ada_get_password(self.url).as_ref() }
+        unsafe { ffi::ada_get_password(self.url) }.as_str()
     }
 
     pub fn port(&self) -> &str {
-        unsafe { ffi::ada_get_port(self.url).as_ref() }
+        unsafe { ffi::ada_get_port(self.url) }.as_str()
     }
 
     pub fn hash(&self) -> &str {
-        unsafe { ffi::ada_get_hash(self.url).as_ref() }
+        unsafe { ffi::ada_get_hash(self.url) }.as_str()
     }
 
     pub fn host(&self) -> &str {
-        unsafe { ffi::ada_get_host(self.url).as_ref() }
+        unsafe { ffi::ada_get_host(self.url) }.as_str()
     }
 
     pub fn hostname(&self) -> &str {
-        unsafe { ffi::ada_get_hostname(self.url).as_ref() }
+        unsafe { ffi::ada_get_hostname(self.url) }.as_str()
     }
 
     pub fn pathname(&self) -> &str {
-        unsafe { ffi::ada_get_pathname(self.url).as_ref() }
+        unsafe { ffi::ada_get_pathname(self.url) }.as_str()
     }
 
     pub fn search(&self) -> &str {
-        unsafe { ffi::ada_get_search(self.url).as_ref() }
+        unsafe { ffi::ada_get_search(self.url) }.as_str()
     }
 
     pub fn protocol(&self) -> &str {
-        unsafe { ffi::ada_get_protocol(self.url).as_ref() }
+        unsafe { ffi::ada_get_protocol(self.url) }.as_str()
     }
 }
 
 pub fn parse<U: AsRef<str>>(url: U) -> Result<Url, Error> {
+    let url_with_0_terminate = std::ffi::CString::new(url.as_ref()).unwrap();
     unsafe {
-        let mut url_aggregator = ffi::ada_parse(url.as_ref().as_ptr().cast());
+        let url_aggregator = ffi::ada_parse(url_with_0_terminate.as_ptr());
 
         if ffi::ada_is_valid(url_aggregator) {
             Ok(Url {
@@ -191,5 +195,15 @@ pub fn parse<U: AsRef<str>>(url: U) -> Result<Url, Error> {
         } else {
             Err(Error::ParseUrl(url.as_ref().to_owned()))
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn should_parse_simple_url() {
+        assert!(parse("https://google.com").is_ok());
     }
 }
