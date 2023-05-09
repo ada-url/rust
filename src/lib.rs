@@ -125,6 +125,22 @@ impl Drop for Url {
 }
 
 impl Url {
+    pub fn parse<U: AsRef<str>>(url: U) -> Result<Url, Error> {
+        let url_with_0_terminate = std::ffi::CString::new(url.as_ref()).unwrap();
+        unsafe {
+            let url_aggregator = ffi::ada_parse(url_with_0_terminate.as_ptr());
+
+            if ffi::ada_is_valid(url_aggregator) {
+                Ok(Url {
+                    origin: None,
+                    url: url_aggregator,
+                })
+            } else {
+                Err(Error::ParseUrl(url.as_ref().to_owned()))
+            }
+        }
+    }
+
     pub fn can_parse(input: &str, base: Option<&str>) -> bool {
         unsafe {
             ffi::ada_can_parse(
@@ -182,28 +198,33 @@ impl Url {
     }
 }
 
-pub fn parse<U: AsRef<str>>(url: U) -> Result<Url, Error> {
-    let url_with_0_terminate = std::ffi::CString::new(url.as_ref()).unwrap();
-    unsafe {
-        let url_aggregator = ffi::ada_parse(url_with_0_terminate.as_ptr());
-
-        if ffi::ada_is_valid(url_aggregator) {
-            Ok(Url {
-                origin: None,
-                url: url_aggregator,
-            })
-        } else {
-            Err(Error::ParseUrl(url.as_ref().to_owned()))
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn should_parse_simple_url() {
-        assert!(parse("https://google.com").is_ok());
+        let mut out = Url::parse("https://username:password@google.com:9090/search?query#hash")
+            .expect("Should have parsed a simple url");
+        assert_eq!(out.origin(), "https://google.com:9090");
+        assert_eq!(
+            out.href(),
+            "https://username:password@google.com:9090/search?query#hash"
+        );
+        assert_eq!(out.username(), "username");
+        assert_eq!(out.password(), "password");
+        assert_eq!(out.port(), "9090");
+        assert_eq!(out.hash(), "#hash");
+        assert_eq!(out.host(), "google.com:9090");
+        assert_eq!(out.hostname(), "google.com");
+        assert_eq!(out.pathname(), "/search");
+        assert_eq!(out.search(), "?query");
+        assert_eq!(out.protocol(), "https:");
+    }
+
+    #[test]
+    fn can_parse_simple_url() {
+        assert!(Url::can_parse("https://google.com", None));
+        assert!(Url::can_parse("/helo", Some("https://www.google.com")));
     }
 }
