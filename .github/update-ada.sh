@@ -17,5 +17,5 @@ trap cleanup INT TERM EXIT
 cd "$WORKSPACE"
 curl -sL -o "ada" "https://github.com/ada-url/ada/releases/latest/download/singleheader.zip"
 unzip ada
-echo "$DEPENDENCIES_DIR"
-cp ada.h ada.cpp "$DEPENDENCIES_DIR"
+rm ada
+cp * "$DEPENDENCIES_DIR"
