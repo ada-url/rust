@@ -10,7 +10,7 @@ license = "MIT AND APACHE-2.0"
 exclude = [".github"]
 
 [dependencies]
-cxx = "1.0"
+thiserror = "1"
 
 [build-dependencies]
-cxx-build = "1.0"
+cc = { version = "1.0", features = ["parallel"] }
