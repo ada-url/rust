@@ -1,5 +1,6 @@
 use std::env;
 
+// Taken from https://github.com/Brooooooklyn/ada-url/blob/main/ada/build.rs
 fn main() {
     println!("cargo:rerun-if-changed=deps/ada.cpp");
     println!("cargo:rerun-if-changed=deps/ada.h");

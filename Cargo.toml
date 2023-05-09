@@ -9,8 +9,15 @@ repository = "https://github.com/ada-url/rust"
 license = "MIT AND APACHE-2.0"
 exclude = [".github"]
 
+[[bench]]
+name = "parse"
+path = "bench/parse.rs"
+
 [dependencies]
 thiserror = "1"
+
+[dev-dependencies]
+url = "2" # Used by benchmarks
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
