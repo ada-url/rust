@@ -251,6 +251,42 @@ impl Url {
         let input_with_0_terminate = std::ffi::CString::new(input.as_ref()).unwrap();
         unsafe { ffi::ada_set_protocol(self.url, input_with_0_terminate.as_ptr()) }
     }
+
+    pub fn has_credentials(&self) -> bool {
+        unsafe { ffi::ada_has_credentials(self.url) }
+    }
+
+    pub fn has_empty_hostname(&self) -> bool {
+        unsafe { ffi::ada_has_empty_hostname(self.url) }
+    }
+
+    pub fn has_hostname(&self) -> bool {
+        unsafe { ffi::ada_has_hostname(self.url) }
+    }
+
+    pub fn has_non_empty_username(&self) -> bool {
+        unsafe { ffi::ada_has_non_empty_username(self.url) }
+    }
+
+    pub fn has_non_empty_password(&self) -> bool {
+        unsafe { ffi::ada_has_non_empty_password(self.url) }
+    }
+
+    pub fn has_port(&self) -> bool {
+        unsafe { ffi::ada_has_port(self.url) }
+    }
+
+    pub fn has_password(&self) -> bool {
+        unsafe { ffi::ada_has_password(self.url) }
+    }
+
+    pub fn has_hash(&self) -> bool {
+        unsafe { ffi::ada_has_hash(self.url) }
+    }
+
+    pub fn has_search(&self) -> bool {
+        unsafe { ffi::ada_has_search(self.url) }
+    }
 }
 
 #[cfg(test)]
@@ -293,6 +329,13 @@ mod test {
 
         out.set_protocol("wss");
         assert_eq!(out.protocol(), "wss:");
+
+        assert!(out.has_credentials());
+        assert!(out.has_non_empty_username());
+        assert!(out.has_non_empty_password());
+        assert!(out.has_search());
+        assert!(out.has_hash());
+        assert!(out.has_password());
     }
 
     #[test]
