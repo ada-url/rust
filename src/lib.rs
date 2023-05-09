@@ -136,6 +136,14 @@ impl Drop for Url {
 }
 
 impl Url {
+    /// Parses the input with an optional base
+    ///
+    /// ```
+    /// use ada_url::Url;
+    /// let out = Url::parse("https://ada-url.github.io/ada", None)
+    ///     .expect("This is a valid URL. Should have parsed it.");
+    /// assert_eq!(out.protocol(), "https:");
+    /// ```
     pub fn parse(input: &str, base: Option<&str>) -> Result<Url, Error> {
         unsafe {
             let url_aggregator = match base {
@@ -159,6 +167,13 @@ impl Url {
         }
     }
 
+    /// Returns whether or not the URL can be parsed or not.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    /// assert!(Url::can_parse("https://ada-url.github.io/ada", None));
+    /// assert!(Url::can_parse("/pathname", Some("https://ada-url.github.io/ada")));
+    /// ```
     pub fn can_parse(input: &str, base: Option<&str>) -> bool {
         unsafe {
             if let Some(base) = base {
