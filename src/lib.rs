@@ -1,4 +1,4 @@
-use std::{ptr, mem};
+use std::ptr;
 use thiserror::Error;
 
 pub mod ffi {
@@ -53,7 +53,7 @@ pub mod ffi {
     }
 
     extern "C" {
-        pub fn ada_parse(url: *const c_char) -> ada_url;
+        pub fn ada_parse(url: *const c_char) -> *mut ada_url;
         pub fn ada_free(url: *mut ada_url);
         pub fn ada_free_owned_string(url: *mut ada_owned_string);
         pub fn ada_is_valid(url: *mut ada_url) -> bool;
@@ -181,7 +181,7 @@ impl Url {
 
 pub fn parse<U: AsRef<str>>(url: U) -> Result<Url, Error> {
     unsafe {
-        let url_aggregator = ffi::ada_parse(url.as_ref().as_ptr().cast());
+        let mut url_aggregator = ffi::ada_parse(url.as_ref().as_ptr().cast());
 
         if ffi::ada_is_valid(url_aggregator) {
             Ok(Url {
