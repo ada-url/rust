@@ -41,7 +41,7 @@ pub mod ffi {
     }
 
     #[repr(C)]
-    pub struct url_components {
+    pub struct ada_url_components {
         pub protocol_end: u32,
         pub username_end: u32,
         pub host_start: u32,
@@ -58,6 +58,9 @@ pub mod ffi {
         pub fn ada_free_owned_string(url: *mut ada_owned_string);
         pub fn ada_is_valid(url: *mut ada_url) -> bool;
         pub fn ada_can_parse(url: *const c_char, base: *const c_char) -> bool;
+        pub fn ada_get_url_components(url: *mut ada_url) -> ada_url_components;
+
+        // Getters
         pub fn ada_get_origin(url: *mut ada_url) -> ada_owned_string;
         pub fn ada_get_href(url: *mut ada_url) -> ada_string;
         pub fn ada_get_username(url: *mut ada_url) -> ada_string;
@@ -69,6 +72,30 @@ pub mod ffi {
         pub fn ada_get_pathname(url: *mut ada_url) -> ada_string;
         pub fn ada_get_search(url: *mut ada_url) -> ada_string;
         pub fn ada_get_protocol(url: *mut ada_url) -> ada_string;
+
+        // Setters
+        pub fn ada_set_origin(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_href(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_username(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_password(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_port(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_hash(url: *mut ada_url, input: *const c_char);
+        pub fn ada_set_host(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_hostname(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_pathname(url: *mut ada_url, input: *const c_char) -> bool;
+        pub fn ada_set_search(url: *mut ada_url, input: *const c_char);
+        pub fn ada_set_protocol(url: *mut ada_url, input: *const c_char) -> bool;
+
+        // Validators
+        pub fn ada_has_credentials(url: *mut ada_url) -> bool;
+        pub fn ada_has_empty_hostname(url: *mut ada_url) -> bool;
+        pub fn ada_has_hostname(url: *mut ada_url) -> bool;
+        pub fn ada_has_non_empty_username(url: *mut ada_url) -> bool;
+        pub fn ada_has_non_empty_password(url: *mut ada_url) -> bool;
+        pub fn ada_has_port(url: *mut ada_url) -> bool;
+        pub fn ada_has_password(url: *mut ada_url) -> bool;
+        pub fn ada_has_hash(url: *mut ada_url) -> bool;
+        pub fn ada_has_search(url: *mut ada_url) -> bool;
     }
 }
 
