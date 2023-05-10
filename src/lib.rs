@@ -86,7 +86,6 @@ pub mod ffi {
         pub fn ada_get_protocol(url: *mut ada_url) -> ada_string;
 
         // Setters
-        pub fn ada_set_origin(url: *mut ada_url, input: *const c_char, length: usize) -> bool;
         pub fn ada_set_href(url: *mut ada_url, input: *const c_char, length: usize) -> bool;
         pub fn ada_set_username(url: *mut ada_url, input: *const c_char, length: usize) -> bool;
         pub fn ada_set_password(url: *mut ada_url, input: *const c_char, length: usize) -> bool;
@@ -194,10 +193,6 @@ impl Url {
             self.origin = Some(ffi::ada_get_origin(self.url));
             self.origin.map(|o| (*o).as_ref()).unwrap_or("")
         }
-    }
-
-    pub fn set_origin(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_origin(self.url, input.as_ptr().cast(), input.len()) }
     }
 
     pub fn href(&self) -> &str {
