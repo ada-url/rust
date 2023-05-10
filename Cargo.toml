@@ -1,6 +1,6 @@
 [package]
 name = "ada-url"
-authors = ["Yagiz Nizipli <yagiz@nizipli.com>", "Daniel Lemire <daniel@lemire.me>"]
+authors = ["Yagiz Nizipli <yagiz@nizipli.com>", "Daniel Lemire <daniel@lemire.me>", "LongYinan <github@lyn.one>"]
 version = "0.1.0"
 edition = "2021"
 description = "Fast WHATWG Compliant URL parser"
@@ -13,6 +13,10 @@ exclude = [".github"]
 name = "parse"
 path = "bench/parse.rs"
 
+[features]
+# pass `cpp_set_stdlib("c++")` to `cc`
+libcpp = []
+
 [dependencies]
 thiserror = "1"
 
@@ -21,3 +25,10 @@ url = "2" # Used by benchmarks
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
+link_args = "0.6"
+
+[profile.bench]
+opt-level = 3
+lto = true
+codegen-units = 1
+overflow-checks = false
