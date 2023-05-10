@@ -1,4 +1,3 @@
-use crate::ffi::{ada_parse, ada_parse_with_base};
 use thiserror::Error;
 
 pub mod ffi {
@@ -73,7 +72,7 @@ pub mod ffi {
         pub fn ada_get_url_components(url: *mut ada_url) -> ada_url_components;
 
         // Getters
-        pub fn ada_get_origin(url: *mut ada_url) -> *mut ada_owned_string;
+        pub fn ada_get_origin(url: *mut ada_url) -> ada_owned_string;
         pub fn ada_get_href(url: *mut ada_url) -> ada_string;
         pub fn ada_get_username(url: *mut ada_url) -> ada_string;
         pub fn ada_get_password(url: *mut ada_url) -> ada_string;
@@ -117,17 +116,11 @@ pub enum Error {
 }
 
 pub struct Url {
-    origin: Option<*mut ffi::ada_owned_string>,
     url: *mut ffi::ada_url,
 }
 
 impl Drop for Url {
     fn drop(&mut self) {
-        if let Some(origin) = self.origin {
-            unsafe {
-                ffi::ada_free_owned_string(origin);
-            }
-        }
         unsafe {
             ffi::ada_free(self.url);
         }
@@ -146,19 +139,18 @@ impl Url {
     pub fn parse(input: &str, base: Option<&str>) -> Result<Url, Error> {
         let url_aggregator = match base {
             Some(base) => unsafe {
-                ada_parse_with_base(
+                ffi::ada_parse_with_base(
                     input.as_ptr().cast(),
                     input.len(),
                     base.as_ptr().cast(),
                     base.len(),
                 )
             },
-            None => unsafe { ada_parse(input.as_ptr().cast(), input.len()) },
+            None => unsafe { ffi::ada_parse(input.as_ptr().cast(), input.len()) },
         };
 
         if unsafe { ffi::ada_is_valid(url_aggregator) } {
             Ok(Url {
-                origin: None,
                 url: url_aggregator,
             })
         } else {
@@ -190,8 +182,9 @@ impl Url {
 
     pub fn origin(&mut self) -> &str {
         unsafe {
-            self.origin = Some(ffi::ada_get_origin(self.url));
-            self.origin.map(|o| (*o).as_ref()).unwrap_or("")
+            let out = ffi::ada_get_origin(self.url);
+            let slice = std::slice::from_raw_parts(out.data.cast(), out.length);
+            std::str::from_utf8_unchecked(slice)
         }
     }
 
