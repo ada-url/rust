@@ -17,10 +17,21 @@ fn main() {
     let compile_target_env = env::var("CARGO_CFG_TARGET_ENV").expect("CARGO_CFG_TARGET_ENV");
     if !(compile_target_os == "windows" && compile_target_env == "msvc") {
         build.compiler("clang++");
-        build.cpp_set_stdlib("c++").flag("-std=c++17");
-        println!("cargo:rustc-link-lib=c++");
+        build.flag("-std=c++17");
+        #[cfg(feature = "libcpp")]
+        {
+            build.cpp_set_stdlib("c++");
+            println!("cargo:rustc-link-lib=c++");
+        }
     } else {
         build.flag("/std:c++17").static_crt(true);
+        link_args::windows! {
+            unsafe {
+                no_default_lib(
+                    "libcmt.lib",
+                );
+            }
+        };
     }
 
     build.compile("ada");
