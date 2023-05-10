@@ -6,12 +6,13 @@ Fast [WHATWG specification](https://url.spec.whatwg.org) compliant URL parser fo
 
 Add the following as a dependency to your project (`Cargo.toml`):
 
-```
+```toml
 [dependencies]
-ada-url = { git = "https://github.com/ada-url/rust" }
+ada-url = "0.1"
 ```
 
 Here is an example illustrating a common usage:
+
 ```Rust
 use ada_url::Url;
 fn main() {
