@@ -144,25 +144,25 @@ impl Url {
     /// assert_eq!(out.protocol(), "https:");
     /// ```
     pub fn parse(input: &str, base: Option<&str>) -> Result<Url, Error> {
-        unsafe {
-            let url_aggregator = match base {
-                Some(base) => ada_parse_with_base(
+        let url_aggregator = match base {
+            Some(base) => unsafe {
+                ada_parse_with_base(
                     input.as_ptr().cast(),
                     input.len(),
                     base.as_ptr().cast(),
                     base.len(),
-                ),
-                None => ada_parse(input.as_ptr().cast(), input.len()),
-            };
+                )
+            },
+            None => unsafe { ada_parse(input.as_ptr().cast(), input.len()) },
+        };
 
-            if ffi::ada_is_valid(url_aggregator) {
-                Ok(Url {
-                    origin: None,
-                    url: url_aggregator,
-                })
-            } else {
-                Err(Error::ParseUrl(input.to_owned()))
-            }
+        if unsafe { ffi::ada_is_valid(url_aggregator) } {
+            Ok(Url {
+                origin: None,
+                url: url_aggregator,
+            })
+        } else {
+            Err(Error::ParseUrl(input.to_owned()))
         }
     }
 
