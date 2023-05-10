@@ -1,0 +1,11 @@
+# https://github.com/cross-rs/cross/blob/main/docs/cross_toml.md
+
+[target.x86_64-unknown-linux-gnu]
+pre-build = [
+  "apt-get update && apt-get install --assume-yes --no-install-recommends libclang-dev clang"
+]
+
+[target.aarch64-unknown-linux-gnu]
+pre-build = [
+  "apt-get update && apt-get install --assume-yes --no-install-recommends libclang-dev clang"
+]

@@ -1,6 +1,11 @@
 [package]
 name = "ada-url"
-authors = ["Yagiz Nizipli <yagiz@nizipli.com>", "Daniel Lemire <daniel@lemire.me>", "LongYinan <github@lyn.one>"]
+authors = [
+  "Yagiz Nizipli <yagiz@nizipli.com>",
+  "Daniel Lemire <daniel@lemire.me>",
+  "LongYinan <github@lyn.one>",
+  "Boshen <boshenc@gmail.com>"
+]
 version = "0.1.0"
 edition = "2021"
 description = "Fast WHATWG Compliant URL parser"
