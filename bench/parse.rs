@@ -1,11 +1,5 @@
-#![feature(test)]
-
-extern crate test;
-
-// Taken from https://github.com/Brooooooklyn/ada-url/blob/main/ada/bench/parse.rs
-
 use ada_url::Url;
-use test::{black_box, Bencher};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 const URL: &[&str] = &[
     "https://www.google.com/",
@@ -28,20 +22,23 @@ const URL: &[&str] = &[
     "http://[2606:4700:4700::1111]", // ipv6
 ];
 
-#[bench]
-fn ada_parse(b: &mut Bencher) {
-    b.iter(|| {
-        URL.iter().for_each(|url| {
-            let _ = black_box(Url::parse(url, None));
+fn bench_url_parse(b: &mut Criterion) {
+    b.benchmark_group("url_parse")
+        .bench_function("ada_parse", |b| {
+            b.iter(|| {
+                URL.iter().for_each(|url| {
+                    let _ = Url::parse(black_box(url), None);
+                });
+            })
+        })
+        .bench_function("servo_parse", |b| {
+            b.iter(|| {
+                URL.iter().for_each(|url| {
+                    let _ = url::Url::parse(black_box(url));
+                });
+            })
         });
-    });
 }
 
-#[bench]
-fn servo_parse(b: &mut Bencher) {
-    b.iter(|| {
-        URL.iter().for_each(|url| {
-            let _ = black_box(url::Url::parse(url));
-        });
-    });
-}
+criterion_group!(benches, bench_url_parse);
+criterion_main!(benches);

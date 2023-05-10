@@ -12,6 +12,7 @@ exclude = [".github"]
 [[bench]]
 name = "parse"
 path = "bench/parse.rs"
+harness = false
 
 [features]
 # pass `cpp_set_stdlib("c++")` to `cc`
@@ -21,14 +22,9 @@ libcpp = []
 thiserror = "1"
 
 [dev-dependencies]
+criterion = "0.4"
 url = "2" # Used by benchmarks
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 link_args = "0.6"
-
-[profile.bench]
-opt-level = 3
-lto = true
-codegen-units = 1
-overflow-checks = false
