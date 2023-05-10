@@ -323,7 +323,7 @@ mod test {
             None,
         )
         .expect("Should have parsed a simple url");
-        // assert_eq!(out.origin(), "https://google.com:9090");
+        assert_eq!(out.origin(), "https://google.com:9090");
         assert_eq!(
             out.href(),
             "https://username:password@google.com:9090/search?query#hash"
