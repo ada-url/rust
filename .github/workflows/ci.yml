@@ -29,6 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - run: rustup toolchain install nightly --profile minimal
+
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: ci
@@ -39,8 +41,8 @@ jobs:
       - name: Cargo Check
         shell: bash
         run: |
-          cargo check --all-targets --all-features --locked
-          cargo test --no-run --all-targets --all-features
+          rustup run nightly cargo check --all-targets --all-features --locked
+          rustup run nightly cargo test --no-run --all-targets --all-features
 
   format:
     name: Format
