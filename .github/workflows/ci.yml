@@ -41,8 +41,8 @@ jobs:
       - name: Cargo Check
         shell: bash
         run: |
-          rustup run nightly cargo check --all-targets --all-features --locked
-          rustup run nightly cargo test --no-run --all-targets --all-features
+          cargo check --all-targets --all-features --locked
+          cargo test --no-run --all-targets --all-features
 
   format:
     name: Format
