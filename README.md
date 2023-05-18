@@ -8,7 +8,7 @@ Add the following as a dependency to your project (`Cargo.toml`):
 
 ```toml
 [dependencies]
-ada-url = "0.1"
+ada-url = "1"
 ```
 
 Here is an example illustrating a common usage:
