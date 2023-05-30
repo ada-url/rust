@@ -6,7 +6,7 @@ authors = [
    "LongYinan <github@lyn.one>",
    "Boshen <boshenc@gmail.com>"
  ]
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 description = "Fast WHATWG Compliant URL parser"
 readme = "README.md"
