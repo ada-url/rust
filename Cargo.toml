@@ -9,11 +9,13 @@ authors = [
 version = "1.0.2"
 edition = "2021"
 description = "Fast WHATWG Compliant URL parser"
+documentation = "https://docs.rs/ada-url"
 readme = "README.md"
-repository = "https://github.com/ada-url/rust"
+keywords = ["url", "parser", "whatwg", "performance"]
+categories = ["parser-implementations", "web-programming", "encoding"]
+repository = "https://ada-url.com"
 license = "MIT OR Apache-2.0"
 include = ["src/**/*", "LICENSE-*", "README.md", "tests/**", "deps/**"]
-exclude = [".github"]
 
 [[bench]]
 name = "parse"
