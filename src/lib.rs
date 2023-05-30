@@ -1,3 +1,25 @@
+//! # Ada URL
+//!
+//! Ada is a fast and spec-compliant URL parser written in C++.
+//! - It's widely tested by both Web Platform Tests and Google OSS Fuzzer.
+//! - It is extremely fast.
+//! - It's the default URL parser of Node.js since Node 18.16.0.
+//! - It supports Unicode Technical Standard.
+//!
+//! The Ada library passes the full range of tests from the specification, across a wide range
+//! of platforms (e.g., Windows, Linux, macOS).
+//!
+//! ## Performance
+//!
+//! Ada is extremely fast.
+//! For more information read our [benchmark page](https://ada-url.com/docs/performance).
+//!
+//! ```text
+//!      ada  ▏  188 ns/URL ███▏
+//! servo url ▏  664 ns/URL ███████████▎
+//!     CURL  ▏ 1471 ns/URL █████████████████████████
+//! ```
+
 use thiserror::Error;
 
 pub mod ffi {
