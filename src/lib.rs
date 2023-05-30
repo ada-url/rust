@@ -160,6 +160,8 @@ impl Url {
 
     /// Returns whether or not the URL can be parsed or not.
     ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-canparse)
+    ///
     /// ```
     /// use ada_url::Url;
     /// assert!(Url::can_parse("https://ada-url.github.io/ada", None));
@@ -180,6 +182,16 @@ impl Url {
         }
     }
 
+    /// Return the origin of this URL
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-origin)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("blob:https://example.com/foo", None).expect("Invalid URL");
+    /// assert_eq!(url.origin(), "https://example.com");
+    /// ```
     pub fn origin(&mut self) -> &str {
         unsafe {
             let out = ffi::ada_get_origin(self.url);
@@ -188,6 +200,8 @@ impl Url {
         }
     }
 
+    /// Return the parsed version of the URL with all components.
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-href)
     pub fn href(&self) -> &str {
         unsafe { ffi::ada_get_href(self.url) }.as_str()
     }
@@ -196,6 +210,16 @@ impl Url {
         unsafe { ffi::ada_set_href(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return the username for this URL as a percent-encoded ASCII string.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-username)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("ftp://rms:secret123@example.com", None).expect("Invalid URL");
+    /// assert_eq!(url.username(), "rms");
+    /// ```
     pub fn username(&self) -> &str {
         unsafe { ffi::ada_get_username(self.url) }.as_str()
     }
@@ -204,6 +228,16 @@ impl Url {
         unsafe { ffi::ada_set_username(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return the password for this URL, if any, as a percent-encoded ASCII string.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-password)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("ftp://rms:secret123@example.com", None).expect("Invalid URL");
+    /// assert_eq!(url.password(), "secret123");
+    /// ```
     pub fn password(&self) -> &str {
         unsafe { ffi::ada_get_password(self.url) }.as_str()
     }
@@ -212,6 +246,19 @@ impl Url {
         unsafe { ffi::ada_set_password(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return the port number for this URL, or an empty string.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-port)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("https://example.com", None).expect("Invalid URL");
+    /// assert_eq!(url.port(), "");
+    ///
+    /// let url = Url::parse("https://example.com:8080", None).expect("Invalid URL");
+    /// assert_eq!(url.port(), "8080");
+    /// ```
     pub fn port(&self) -> &str {
         unsafe { ffi::ada_get_port(self.url) }.as_str()
     }
@@ -220,6 +267,23 @@ impl Url {
         unsafe { ffi::ada_set_port(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return this URL’s fragment identifier, or an empty string.
+    /// A fragment is the part of the URL with the # symbol.
+    /// The fragment is optional and, if present, contains a fragment identifier that identifies
+    /// a secondary resource, such as a section heading of a document.
+    /// In HTML, the fragment identifier is usually the id attribute of a an element that is
+    /// scrolled to on load. Browsers typically will not send the fragment portion of a URL to the
+    /// server.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-hash)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("https://example.com/data.csv#row=4", None).expect("Invalid URL");
+    /// assert_eq!(url.hash(), "#row=4");
+    /// assert!(url.has_hash());
+    /// ```
     pub fn hash(&self) -> &str {
         unsafe { ffi::ada_get_hash(self.url) }.as_str()
     }
@@ -228,6 +292,16 @@ impl Url {
         unsafe { ffi::ada_set_hash(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return the parsed representation of the host for this URL with an optional port number.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-host)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("https://127.0.0.1:8080/index.html", None).expect("Invalid URL");
+    /// assert_eq!(url.host(), "127.0.0.1:8080");
+    /// ```
     pub fn host(&self) -> &str {
         unsafe { ffi::ada_get_host(self.url) }.as_str()
     }
@@ -236,6 +310,20 @@ impl Url {
         unsafe { ffi::ada_set_host(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return the parsed representation of the host for this URL. Non-ASCII domain labels are
+    /// punycode-encoded per IDNA if this is the host of a special URL, or percent encoded for
+    /// non-special URLs.
+    ///
+    /// Hostname does not contain port number.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-hostname)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("https://127.0.0.1:8080/index.html", None).expect("Invalid URL");
+    /// assert_eq!(url.hostname(), "127.0.0.1");
+    /// ```
     pub fn hostname(&self) -> &str {
         unsafe { ffi::ada_get_hostname(self.url) }.as_str()
     }
@@ -244,6 +332,16 @@ impl Url {
         unsafe { ffi::ada_set_hostname(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return the path for this URL, as a percent-encoded ASCII string.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-pathname)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("https://example.com/api/versions?page=2", None).expect("Invalid URL");
+    /// assert_eq!(url.pathname(), "/api/versions");
+    /// ```
     pub fn pathname(&self) -> &str {
         unsafe { ffi::ada_get_pathname(self.url) }.as_str()
     }
@@ -252,6 +350,19 @@ impl Url {
         unsafe { ffi::ada_set_pathname(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return this URL’s query string, if any, as a percent-encoded ASCII string.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-search)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("https://example.com/products?page=2", None).expect("Invalid URL");
+    /// assert_eq!(url.search(), "?page=2");
+    ///
+    /// let url = Url::parse("https://example.com/products", None).expect("Invalid URL");
+    /// assert_eq!(url.search(), "");
+    /// ```
     pub fn search(&self) -> &str {
         unsafe { ffi::ada_get_search(self.url) }.as_str()
     }
@@ -260,6 +371,16 @@ impl Url {
         unsafe { ffi::ada_set_search(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// Return the scheme of this URL, lower-cased, as an ASCII string with the ‘:’ delimiter.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-protocol)
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let url = Url::parse("file:///tmp/foo", None).expect("Invalid URL");
+    /// assert_eq!(url.protocol(), "file:");
+    /// ```
     pub fn protocol(&self) -> &str {
         unsafe { ffi::ada_get_protocol(self.url) }.as_str()
     }
