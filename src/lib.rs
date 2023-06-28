@@ -504,18 +504,16 @@ impl std::fmt::Debug for Url {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         unsafe {
             let components = ffi::ada_get_components(self.url).as_ref().unwrap();
-
             let mut debug = f.debug_struct("Url");
-
             debug
                 .field("href", &self.href())
                 .field("protocol_end", &components.protocol_end)
                 .field("host_start", &components.host_start)
                 .field("host_end", &components.host_end);
             let port = if components.port == u32::MAX {
-                Some(components.port)
-            } else {
                 None
+            } else {
+                Some(components.port)
             };
             let username_end = if components.username_end == u32::MAX {
                 None
