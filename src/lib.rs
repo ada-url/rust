@@ -136,7 +136,7 @@ pub enum Error {
     #[error("Invalid url: \"{0}\"")]
     ParseUrl(String),
 }
-
+#[derive(Clone)]
 pub struct Url {
     url: *mut ffi::ada_url,
 }
@@ -455,13 +455,88 @@ impl Url {
     }
 }
 
+/// URLs compare like their stringification.
+impl PartialEq for Url {
+    fn eq(&self, other: &Self) -> bool {
+        self.href() == other.href()
+    }
+}
+
+impl Eq for Url {}
+
+impl PartialOrd for Url {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.href().partial_cmp(other.href())
+    }
+}
+
+impl Ord for Url {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.href().cmp(other.href())
+    }
+}
+
+impl std::hash::Hash for Url {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.href().hash(state)
+    }
+}
+
+impl std::borrow::Borrow<str> for Url {
+    fn borrow(&self) -> &str {
+        self.href()
+    }
+}
+
+impl std::borrow::Borrow<[u8]> for Url {
+    fn borrow(&self) -> &[u8] {
+        self.href().as_bytes()
+    }
+}
+
+impl std::convert::AsRef<[u8]> for Url {
+    fn as_ref(&self) -> &[u8] {
+        self.href().as_bytes()
+    }
+}
+
+impl std::fmt::Debug for Url {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "\"{}\"", self.href())
+    }
+}
+
+impl TryFrom<&str> for Url {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::parse(value, None)
+    }
+}
+
+impl TryFrom<String> for Url {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::parse(&value, None)
+    }
+}
+
+impl TryFrom<&String> for Url {
+    type Error = Error;
+
+    fn try_from(value: &String) -> Result<Self, Self::Error> {
+        Self::parse(value, None)
+    }
+}
+
 impl std::ops::Deref for Url {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         self.href()
     }
 }
-impl AsRef<str> for Url {
+impl std::convert::AsRef<str> for Url {
     fn as_ref(&self) -> &str {
         self.href()
     }
@@ -483,7 +558,64 @@ impl std::str::FromStr for Url {
 
 #[cfg(test)]
 mod test {
+
     use super::*;
+    #[test]
+    fn should_display_serialization() {
+        let tests = [
+            ("http://example.com/", "http://example.com/"),
+            ("HTTP://EXAMPLE.COM", "http://example.com/"),
+            (
+                "http://user:pwd@domain:8080.com",
+                "http://user:pwd@domain:8080.com/",
+            ),
+        ];
+        for (value, expected) in tests {
+            let url = Url::parse(value, None).expect("Should have parsed url");
+            assert_eq!(format!("{}", url), expected);
+            assert_eq!(url.to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn should_compare_urls() {
+        let tests = [
+            ("http://example.com/", "http://example.com/", true),
+            ("http://example.com/", "https://example.com/", false),
+            ("http://example.com#", "https://example.com/#", false),
+            ("http://example.com", "https://example.com#", false),
+            (
+                "https://user:pwd@example.com",
+                "https://user:pwd@example.com",
+                true,
+            ),
+        ];
+        for (left, right, expected) in tests {
+            let left_url = Url::parse(left, None).expect("Should have parsed url");
+            let right_url = Url::parse(right, None).expect("Should have parsed url");
+            assert_eq!(
+                left_url == right_url,
+                expected,
+                "left: {left}, right: {right}, expected: {expected}",
+            );
+        }
+    }
+    #[test]
+    fn clone_should_create_new_instance() {
+        let url = Url::parse("http://example.com/", None).expect("Should have parsed url");
+        let cloned = url.clone();
+        assert_eq!(url, cloned);
+        assert_ne!(url.as_ptr(), cloned.as_ptr());
+    }
+    #[test]
+    fn should_order_alphabetically() {
+        let left = Url::parse("https://example.com/", None).expect("Should have parsed url");
+        let right = Url::parse("https://zoo.tld/", None).expect("Should have parsed url");
+        assert!(left < right);
+        let left = Url::parse("https://c.tld/", None).expect("Should have parsed url");
+        let right = Url::parse("https://a.tld/", None).expect("Should have parsed url");
+        assert!(right < left);
+    }
 
     #[test]
     fn should_parse_simple_url() {
