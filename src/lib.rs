@@ -223,6 +223,7 @@ impl Url {
     }
 
     /// Return the parsed version of the URL with all components.
+    ///
     /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-href)
     pub fn href(&self) -> &str {
         unsafe { ffi::ada_get_href(self.url) }.as_str()
@@ -445,6 +446,30 @@ impl Url {
 
     pub fn has_search(&self) -> bool {
         unsafe { ffi::ada_has_search(self.url) }
+    }
+    /// Returns the parsed version of the URL with all components.
+    ///
+    /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-href)
+    pub fn as_str(&self) -> &str {
+        self.href()
+    }
+}
+
+impl std::ops::Deref for Url {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.href()
+    }
+}
+impl AsRef<str> for Url {
+    fn as_ref(&self) -> &str {
+        self.href()
+    }
+}
+
+impl std::fmt::Display for Url {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.href())
     }
 }
 
