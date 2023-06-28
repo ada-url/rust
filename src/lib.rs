@@ -473,6 +473,14 @@ impl std::fmt::Display for Url {
     }
 }
 
+impl std::str::FromStr for Url {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s, None)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
