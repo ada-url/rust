@@ -576,7 +576,20 @@ mod test {
             assert_eq!(url.to_string(), expected);
         }
     }
-
+    #[test]
+    fn should_parse_with_try_from() {
+        let tests = [("http://example.com/", true), ("invalid url", false)];
+        for (value, should_parse) in tests {
+            let url = Url::parse("http://example.com/", None).unwrap();
+            let parsed = Url::try_from(value);
+            if should_parse {
+                assert_eq!(parsed.is_ok(), should_parse);
+                assert_eq!(url, parsed.unwrap());
+            } else {
+                assert!(parsed.is_err());
+            }
+        }
+    }
     #[test]
     fn should_compare_urls() {
         let tests = [
