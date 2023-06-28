@@ -504,16 +504,46 @@ impl std::fmt::Debug for Url {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         unsafe {
             let components = ffi::ada_get_components(self.url).as_ref().unwrap();
-            f.debug_struct("Url")
+
+            let mut debug = f.debug_struct("Url");
+
+            debug
                 .field("href", &self.href())
                 .field("protocol_end", &components.protocol_end)
-                .field("username_end", &components.username_end)
                 .field("host_start", &components.host_start)
-                .field("host_end", &components.host_end)
-                .field("port", &components.port)
-                .field("pathname_start", &components.pathname_start)
-                .field("search_start", &components.search_start)
-                .field("hash_start", &components.hash_start)
+                .field("host_end", &components.host_end);
+            let port = if components.port == u32::MAX {
+                Some(components.port)
+            } else {
+                None
+            };
+            let username_end = if components.username_end == u32::MAX {
+                None
+            } else {
+                Some(components.username_end)
+            };
+            let search_start = if components.search_start == u32::MAX {
+                None
+            } else {
+                Some(components.search_start)
+            };
+            let hash_start = if components.hash_start == u32::MAX {
+                None
+            } else {
+                Some(components.hash_start)
+            };
+            let pathname_start = if components.pathname_start == u32::MAX {
+                None
+            } else {
+                Some(components.pathname_start)
+            };
+
+            debug
+                .field("port", &port)
+                .field("username_end", &username_end)
+                .field("search_start", &search_start)
+                .field("hash_start", &hash_start)
+                .field("pathname_start", &pathname_start)
                 .finish()
         }
     }
