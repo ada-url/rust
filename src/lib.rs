@@ -91,7 +91,7 @@ pub mod ffi {
             base: *const c_char,
             base_length: usize,
         ) -> bool;
-        pub fn ada_get_components(url: *mut ada_url) -> ada_url_components;
+        pub fn ada_get_components(url: *mut ada_url) -> *mut ada_url_components;
 
         // Getters
         pub fn ada_get_origin(url: *mut ada_url) -> ada_owned_string;
@@ -502,18 +502,20 @@ impl std::convert::AsRef<[u8]> for Url {
 
 impl std::fmt::Debug for Url {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let components = unsafe { ffi::ada_get_components(self.url) };
-        f.debug_struct("Url")
-            .field("href", &self.href())
-            .field("protocol_end", &components.protocol_end)
-            .field("username_end", &components.username_end)
-            .field("host_start", &components.host_start)
-            .field("host_end", &components.host_end)
-            .field("port", &components.port)
-            .field("pathname_start", &components.pathname_start)
-            .field("search_start", &components.search_start)
-            .field("hash_start", &components.hash_start)
-            .finish()
+        unsafe {
+            let components = ffi::ada_get_components(self.url).as_ref().unwrap();
+            f.debug_struct("Url")
+                .field("href", &self.href())
+                .field("protocol_end", &components.protocol_end)
+                .field("username_end", &components.username_end)
+                .field("host_start", &components.host_start)
+                .field("host_end", &components.host_end)
+                .field("port", &components.port)
+                .field("pathname_start", &components.pathname_start)
+                .field("search_start", &components.search_start)
+                .field("hash_start", &components.hash_start)
+                .finish()
+        }
     }
 }
 
@@ -577,7 +579,7 @@ mod test {
         let tests = [("https://www.ada-url.com/playground")];
         for value in tests {
             let url = Url::parse(value, None).expect("Should have parsed url");
-            println!("{:?}", url);
+            println!("{:#?}", url);
         }
     }
 
