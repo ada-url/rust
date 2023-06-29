@@ -652,14 +652,6 @@ mod test {
             );
         }
     }
-    // #[test]
-    // fn clone_should_create_new_instance() {
-    //     let url = Url::parse("http://example.com/", None).expect("Should have parsed url");
-    //     let cloned = url.clone();
-    //     println!("{cloned}");
-    //     assert_eq!(url, cloned);
-    //     assert_ne!(url.as_ptr(), cloned.as_ptr());
-    // }
     #[test]
     fn should_order_alphabetically() {
         let left = Url::parse("https://example.com/", None).expect("Should have parsed url");
