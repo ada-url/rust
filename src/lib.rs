@@ -136,7 +136,7 @@ pub enum Error {
     #[error("Invalid url: \"{0}\"")]
     ParseUrl(String),
 }
-#[derive(Clone)]
+
 pub struct Url {
     url: *mut ffi::ada_url,
 }
@@ -666,6 +666,7 @@ mod test {
     // fn clone_should_create_new_instance() {
     //     let url = Url::parse("http://example.com/", None).expect("Should have parsed url");
     //     let cloned = url.clone();
+    //     println!("{cloned}");
     //     assert_eq!(url, cloned);
     //     assert_ne!(url.as_ptr(), cloned.as_ptr());
     // }
