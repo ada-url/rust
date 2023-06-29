@@ -602,16 +602,6 @@ mod test {
     use super::*;
 
     #[test]
-    fn spike_debug() {
-        // TODO: This is a spike test to see if the debug output is correct. Update or remove this test once clarified that the output is as expected - @chanced
-        let tests = [("https://www.ada-url.com/playground")];
-        for value in tests {
-            let url = Url::parse(value, None).expect("Should have parsed url");
-            println!("{:#?}", url);
-        }
-    }
-
-    #[test]
     fn should_display_serialization() {
         let tests = [
             ("http://example.com/", "http://example.com/"),
