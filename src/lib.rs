@@ -20,7 +20,11 @@
 //!     CURL  ▏ 1471 ns/URL █████████████████████████
 //! ```
 
+mod idna;
+
 use thiserror::Error;
+
+pub use idna::Idna;
 
 pub mod ffi {
     use std::ffi::c_char;
@@ -128,6 +132,10 @@ pub mod ffi {
         pub fn ada_has_password(url: *mut ada_url) -> bool;
         pub fn ada_has_hash(url: *mut ada_url) -> bool;
         pub fn ada_has_search(url: *mut ada_url) -> bool;
+
+        // IDNA methods
+        pub fn ada_idna_to_unicode(input: *const c_char, length: usize) -> ada_owned_string;
+        pub fn ada_idna_to_ascii(input: *const c_char, length: usize) -> ada_owned_string;
     }
 }
 
