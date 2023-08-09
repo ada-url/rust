@@ -421,14 +421,17 @@ impl Url {
         unsafe { ffi::ada_set_protocol(self.url, input.as_ptr().cast(), input.len()) }
     }
 
+    /// A URL includes credentials if its username or password is not the empty string.
     pub fn has_credentials(&self) -> bool {
         unsafe { ffi::ada_has_credentials(self.url) }
     }
 
+    /// Returns true if it has an host but it is the empty string.
     pub fn has_empty_hostname(&self) -> bool {
         unsafe { ffi::ada_has_empty_hostname(self.url) }
     }
 
+    /// Returns true if it has a host (included an empty host)
     pub fn has_hostname(&self) -> bool {
         unsafe { ffi::ada_has_hostname(self.url) }
     }
