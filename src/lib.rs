@@ -22,6 +22,7 @@
 
 mod idna;
 
+use std::{borrow, fmt, hash, ops};
 use thiserror::Error;
 
 pub use idna::Idna;
@@ -484,32 +485,32 @@ impl Ord for Url {
     }
 }
 
-impl std::hash::Hash for Url {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+impl hash::Hash for Url {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.href().hash(state)
     }
 }
 
-impl std::borrow::Borrow<str> for Url {
+impl borrow::Borrow<str> for Url {
     fn borrow(&self) -> &str {
         self.href()
     }
 }
 
-impl std::borrow::Borrow<[u8]> for Url {
+impl borrow::Borrow<[u8]> for Url {
     fn borrow(&self) -> &[u8] {
         self.href().as_bytes()
     }
 }
 
-impl std::convert::AsRef<[u8]> for Url {
+impl AsRef<[u8]> for Url {
     fn as_ref(&self) -> &[u8] {
         self.href().as_bytes()
     }
 }
 
-impl std::fmt::Debug for Url {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Url {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
             let components = ffi::ada_get_components(self.url).as_ref().unwrap();
             let mut debug = f.debug_struct("Url");
@@ -579,20 +580,20 @@ impl TryFrom<&String> for Url {
     }
 }
 
-impl std::ops::Deref for Url {
+impl ops::Deref for Url {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         self.href()
     }
 }
-impl std::convert::AsRef<str> for Url {
+impl AsRef<str> for Url {
     fn as_ref(&self) -> &str {
         self.href()
     }
 }
 
-impl std::fmt::Display for Url {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for Url {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.href())
     }
 }
