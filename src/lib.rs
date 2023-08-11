@@ -19,6 +19,17 @@
 //! servo url ▏  664 ns/URL ███████████▎
 //!     CURL  ▏ 1471 ns/URL █████████████████████████
 //! ```
+//!
+//! # Feature: `serde`
+//!
+//! If you enable the `serde` feature, [`Url`](struct.Url.html) will implement
+//! [`serde::Serialize`](https://docs.rs/serde/1/serde/trait.Serialize.html) and
+//! [`serde::Deserialize`](https://docs.rs/serde/1/serde/trait.Deserialize.html).
+//! See [serde documentation](https://serde.rs) for more information.
+//!
+//! ```toml
+//! ada-url = { version = "1", features = ["serde"] }
+//! ```
 
 pub mod ffi;
 mod idna;
@@ -27,21 +38,23 @@ pub use idna::Idna;
 use std::{borrow, fmt, hash, ops};
 use thiserror::Error;
 
+#[cfg(feature = "serde")]
+extern crate serde;
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Invalid url: \"{0}\"")]
     ParseUrl(String),
 }
 
+#[derive(Eq)]
 pub struct Url {
     url: *mut ffi::ada_url,
 }
 
 impl Drop for Url {
     fn drop(&mut self) {
-        unsafe {
-            ffi::ada_free(self.url);
-        }
+        unsafe { ffi::ada_free(self.url) }
     }
 }
 
@@ -354,14 +367,60 @@ impl Url {
     }
 }
 
+/// Serializes this URL into a `serde` stream.
+///
+/// This implementation is only available if the `serde` Cargo feature is enabled.
+#[cfg(feature = "serde")]
+impl serde::Serialize for Url {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+/// Deserializes this URL from a `serde` stream.
+///
+/// This implementation is only available if the `serde` Cargo feature is enabled.
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Url {
+    fn deserialize<D>(deserializer: D) -> Result<Url, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{Error, Unexpected, Visitor};
+
+        struct UrlVisitor;
+
+        impl<'de> Visitor<'de> for UrlVisitor {
+            type Value = Url;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string representing an URL")
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: Error,
+            {
+                Url::parse(s, None).map_err(|err| {
+                    let err_s = format!("{}", err);
+                    Error::invalid_value(Unexpected::Str(s), &err_s.as_str())
+                })
+            }
+        }
+
+        deserializer.deserialize_str(UrlVisitor)
+    }
+}
+
 /// URLs compare like their stringification.
 impl PartialEq for Url {
     fn eq(&self, other: &Self) -> bool {
         self.href() == other.href()
     }
 }
-
-impl Eq for Url {}
 
 impl PartialOrd for Url {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -476,6 +535,7 @@ impl ops::Deref for Url {
         self.href()
     }
 }
+
 impl AsRef<str> for Url {
     fn as_ref(&self) -> &str {
         self.href()
