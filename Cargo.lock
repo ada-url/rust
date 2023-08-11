@@ -9,6 +9,8 @@ dependencies = [
  "cc",
  "criterion",
  "link_args",
+ "serde",
+ "serde_json",
  "thiserror",
  "url",
 ]
