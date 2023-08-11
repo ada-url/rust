@@ -674,4 +674,16 @@ mod test {
         assert!(Url::can_parse("https://google.com", None));
         assert!(Url::can_parse("/helo", Some("https://www.google.com")));
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_serialize_deserialize() {
+        let input = "https://www.google.com";
+        let output = "\"https://www.google.com/\"";
+        let url = Url::parse(&input, None).unwrap();
+        assert_eq!(serde_json::to_string(&url).unwrap(), output.to_string());
+
+        let deserialized: Url = serde_json::from_str(&output).unwrap();
+        assert_eq!(deserialized.href(), input.to_string() + "/");
+    }
 }
