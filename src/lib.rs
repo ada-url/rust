@@ -47,6 +47,7 @@ pub enum Error {
     ParseUrl(String),
 }
 
+/// A parsed URL struct according to WHATWG URL specification.
 #[derive(Eq)]
 pub struct Url {
     url: *mut ffi::ada_url,
