@@ -25,6 +25,8 @@ harness = false
 [features]
 # pass `cpp_set_stdlib("c++")` to `cc`
 libcpp = []
+# enables serde serialization/deserialization support
+serde = ["dep:serde"]
 
 [dependencies]
 thiserror = "1"
