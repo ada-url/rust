@@ -15,7 +15,6 @@ keywords = ["url", "parser", "whatwg", "performance"]
 categories = ["parser-implementations", "web-programming", "encoding"]
 repository = "https://ada-url.com"
 license = "MIT OR Apache-2.0"
-include = ["src/**/*", "LICENSE-*", "README.md", "tests/**", "deps/**"]
 
 [[bench]]
 name = "parse"
