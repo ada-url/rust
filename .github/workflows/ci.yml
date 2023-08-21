@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 jobs:
-  check:
-    name: Check
+  test:
+    name: Check & Test
     strategy:
       fail-fast: false
       matrix:
@@ -25,9 +25,22 @@ jobs:
           - os: windows-latest
           - os: ubuntu-latest
           - os: macos-latest
+          - os: ubuntu-latest
+            env:
+              CARGO_BUILD_TARGET: wasm32-wasi
+              CARGO_TARGET_WASM32_WASI_RUNNER: /home/runner/.wasmtime/bin/wasmtime --dir=.
     runs-on: ${{ matrix.os }}
+    env: ${{ matrix.env || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@v3
+
+      - name: Install Wasm deps
+        if: matrix.env.CARGO_BUILD_TARGET == 'wasm32-wasi'
+        run: |
+          rustup target add wasm32-wasi
+          curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-20/wasi-sdk_20.0_amd64.deb
+          sudo dpkg --install wasi-sdk_20.0_amd64.deb
+          curl https://wasmtime.dev/install.sh -sSf | bash
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -37,10 +50,10 @@ jobs:
       - run: rustup show
 
       - name: Cargo Check
-        shell: bash
-        run: |
-          cargo check --all-targets --all-features --locked
-          cargo test --no-run --all-targets --all-features
+        run: cargo check --all-targets --all-features --locked
+
+      - name: Cargo Test
+        run: cargo test --all-targets --all-features
 
   format:
     name: Format
@@ -66,25 +79,3 @@ jobs:
       - run: rustup show
 
       - run: cargo clippy -- -D warnings
-
-  test:
-    name: Test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-          - os: ubuntu-latest
-          - os: macos-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: ci
-          save-if: false
-
-      - run: rustup show
-
-      - run: cargo test
