@@ -28,21 +28,14 @@ fn main() {
 
 ### Performance
 
-Ada is fast. The benchmark below shows **2 times** faster URL parsing compared to `url`
+Ada is fast. The benchmark below shows **3.34 times** faster URL parsing compared to `url`
 
 ```
-     Running bench/parse.rs (target/release/deps/parse-dff65469468a2cec)
-url_parse/ada_parse     time:   [2.5853 µs 2.5982 µs 2.6115 µs]
-                        change: [-3.8745% -2.9874% -2.0620%] (p = 0.00 < 0.05)
-                        Performance has improved.
-Found 2 outliers among 100 measurements (2.00%)
-  1 (1.00%) low mild
-  1 (1.00%) high severe
-url_parse/servo_parse   time:   [5.5127 µs 5.6287 µs 5.8046 µs]
-                        change: [+0.7618% +3.0977% +6.5694%] (p = 0.01 < 0.05)
-                        Change within noise threshold.
-Found 2 outliers among 100 measurements (2.00%)
-  2 (2.00%) high severe
+parse/ada_url           time:   [2.0790 µs 2.0812 µs 2.0835 µs]
+                        thrpt:  [369.84 MiB/s 370.25 MiB/s 370.65 MiB/s]
+                        
+parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
+                        thrpt:  [109.77 MiB/s 110.59 MiB/s 111.25 MiB/s]
 ```
 
 ### Implemented traits
