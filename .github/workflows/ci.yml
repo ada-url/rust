@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref_name != 'main' }}
 
 jobs:
-  check:
-    name: Check
+  test:
+    name: Check & Test
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install extra deps
+      - name: Install Wasm deps
         if: matrix.env.CARGO_BUILD_TARGET == 'wasm32-wasi'
         run: |
           rustup target add wasm32-wasi
@@ -50,10 +50,10 @@ jobs:
       - run: rustup show
 
       - name: Cargo Check
-        shell: bash
-        run: |
-          cargo check --all-targets --all-features --locked
-          cargo test --no-run --all-targets --all-features
+        run: cargo check --all-targets --all-features --locked
+
+      - name: Cargo Test
+        run: cargo test --all-targets --all-features
 
   format:
     name: Format
@@ -79,25 +79,3 @@ jobs:
       - run: rustup show
 
       - run: cargo clippy -- -D warnings
-
-  test:
-    name: Test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-          - os: ubuntu-latest
-          - os: macos-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: ci
-          save-if: false
-
-      - run: rustup show
-
-      - run: cargo test
