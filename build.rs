@@ -41,17 +41,14 @@ fn main() {
             println!("cargo:rustc-link-lib=c");
             build.file("./deps/wasi_to_unknown.cpp");
         }
-    } else {
-        if !(compile_target_os == "windows" && compile_target_env == "msvc") {
-            build.compiler("clang++");
-        }
-        if cfg!(feature = "libcpp") {
-            build.cpp_set_stdlib("c++");
-        }
+    } else if !(compile_target_os == "windows" && compile_target_env == "msvc") {
+        build.compiler("clang++");
     }
+
+    let compiler = build.get_compiler();
     // Note: it's possible to use Clang++ explicitly on Windows as well, so this check
     // should be specifically for "is target compiler MSVC" and not "is target OS Windows".
-    if build.get_compiler().is_like_msvc() {
+    if compiler.is_like_msvc() {
         build.static_crt(true);
         link_args::windows! {
             unsafe {
@@ -60,6 +57,8 @@ fn main() {
                 );
             }
         };
+    } else if compiler.is_like_clang() && cfg!(feature = "libcpp") {
+        build.cpp_set_stdlib("c++");
     }
 
     build.compile("ada");
