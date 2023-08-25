@@ -441,7 +441,11 @@ impl<'de> serde::Deserialize<'de> for Url {
     }
 }
 
+/// Send is required for sharing Url between threads safely
 unsafe impl Send for Url {}
+
+/// Sync is required for sharing Url between threads safely
+unsafe impl Sync for Url {}
 
 /// URLs compare like their stringification.
 impl PartialEq for Url {
