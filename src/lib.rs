@@ -589,7 +589,7 @@ mod test {
             ),
             (
                 "https://三十六計.org/走為上策/",
-                "https://xn--ehq95fdxbx86i.org/%E8%B5%B0%E7%82%BA%E4%B8%8A%E7%AD%96/", // weird, but this PR cannot change the implementation
+                "https://xn--ehq95fdxbx86i.org/%E8%B5%B0%E7%82%BA%E4%B8%8A%E7%AD%96/", // weird, but this binding lib cannot change the implementation
             ),
         ];
         for (value, expected) in tests {
