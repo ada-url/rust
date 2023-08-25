@@ -575,6 +575,10 @@ mod test {
             ("http://example.com/", "http://example.com/"),
             ("HTTP://EXAMPLE.COM", "http://example.com/"),
             ("http://user:pwd@domain.com", "http://user:pwd@domain.com/"),
+            (
+                "HTTP://EXAMPLE.COM/FOO/BAR?K1=V1&K2=V2",
+                "http://example.com/FOO/BAR?K1=V1&K2=V2",
+            ),
         ];
         for (value, expected) in tests {
             eprintln!("{value} -> {expected}");
