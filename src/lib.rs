@@ -42,7 +42,7 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 extern crate serde;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("Invalid url: \"{0}\"")]
     ParseUrl(String),
