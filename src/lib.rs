@@ -577,6 +577,7 @@ mod test {
             ("http://user:pwd@domain.com", "http://user:pwd@domain.com/"),
         ];
         for (value, expected) in tests {
+            eprintln!("{value} -> {expected}");
             let url = Url::parse(value, None).expect("Should have parsed url");
             assert_eq!(url.to_string(), expected);
         }
