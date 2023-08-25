@@ -584,19 +584,26 @@ mod test {
     }
 
     #[test]
-    fn should_parse_with_try_from() {
-        let tests = [("http://example.com/", true), ("invalid url", false)];
-        for (value, should_parse) in tests {
-            let url = Url::parse("http://example.com/", None).unwrap();
-            let parsed = Url::try_from(value);
-            if should_parse {
-                assert_eq!(parsed.is_ok(), should_parse);
-                assert_eq!(url, parsed.unwrap());
-            } else {
-                assert!(parsed.is_err());
-            }
-        }
+    fn try_from_ok() {
+        let url = Url::try_from("http://example.com/foo/bar?k1=v1&k2=v2");
+        dbg!(&url);
+        let url = url.unwrap();
+        assert_eq!(url.href(), "http://example.com/foo/bar?k1=v1&k2=v2");
+        assert_eq!(
+            url,
+            Url::parse("http://example.com/foo/bar?k1=v1&k2=v2", None).unwrap(),
+        );
     }
+
+    #[test]
+    fn try_from_err() {
+        let url = Url::try_from("this is not a url");
+        dbg!(&url);
+        let error = url.unwrap_err();
+        assert_eq!(error.to_string(), r#"Invalid url: "this is not a url""#);
+        assert!(matches!(error, Error::ParseUrl(_)));
+    }
+
     #[test]
     fn should_compare_urls() {
         let tests = [
