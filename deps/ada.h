@@ -1,4 +1,4 @@
-/* auto-generated on 2023-08-21 14:44:25 -0400. Do not edit! */
+/* auto-generated on 2023-08-25 15:25:45 -0400. Do not edit! */
 /* begin file include/ada.h */
 /**
  * @file ada.h
@@ -1008,6 +1008,7 @@ ada_really_inline bool bit_at(const uint8_t a[], const uint8_t i) {
 #define ADA_CHECKERS_INL_H
 
 
+#include <algorithm>
 #include <string_view>
 #include <cstring>
 
@@ -1058,7 +1059,7 @@ ada_really_inline constexpr bool begins_with(std::string_view view,
                                              std::string_view prefix) {
   // in C++20, you have view.begins_with(prefix)
   return view.size() >= prefix.size() &&
-         (view.substr(0, prefix.size()) == prefix);
+         std::equal(prefix.begin(), prefix.end(), view.begin());
 }
 
 }  // namespace ada::checkers
@@ -1407,6 +1408,25 @@ constexpr ada::scheme::type get_scheme_type(std::string_view scheme) noexcept;
 namespace ada {
 
 /**
+ * Type of URL host as an enum.
+ */
+enum url_host_type : uint8_t {
+  /**
+   * Represents common URLs such as "https://www.google.com"
+   */
+  DEFAULT = 0,
+  /**
+   * Represents ipv4 addresses such as "http://127.0.0.1"
+   */
+  IPV4 = 1,
+  /**
+   * Represents ipv6 addresses such as
+   * "http://[2001:db8:3333:4444:5555:6666:7777:8888]"
+   */
+  IPV6 = 2,
+};
+
+/**
  * @brief Base class of URL implementations
  *
  * @details A url_base contains a few attributes: is_valid, has_opaque_path and
@@ -1427,6 +1447,11 @@ struct url_base {
    * A URL has an opaque path if its path is a string.
    */
   bool has_opaque_path{false};
+
+  /**
+   * URL hosts type
+   */
+  url_host_type host_type = url_host_type::DEFAULT;
 
   /**
    * @private
@@ -6897,14 +6922,14 @@ inline void url_search_params::sort() {
 #ifndef ADA_ADA_VERSION_H
 #define ADA_ADA_VERSION_H
 
-#define ADA_VERSION "2.6.1"
+#define ADA_VERSION "2.6.2"
 
 namespace ada {
 
 enum {
   ADA_VERSION_MAJOR = 2,
   ADA_VERSION_MINOR = 6,
-  ADA_VERSION_REVISION = 1,
+  ADA_VERSION_REVISION = 2,
 };
 
 }  // namespace ada

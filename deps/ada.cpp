@@ -1,4 +1,4 @@
-/* auto-generated on 2023-08-21 14:44:25 -0400. Do not edit! */
+/* auto-generated on 2023-08-25 15:25:45 -0400. Do not edit! */
 /* begin file src/ada.cpp */
 #include "ada.h"
 /* begin file src/checkers.cpp */
@@ -11231,6 +11231,7 @@ final:
   } else {
     host = ada::serializers::ipv4(ipv4);  // We have to reserialize the address.
   }
+  host_type = IPV4;
   return true;
 }
 
@@ -11460,6 +11461,7 @@ bool url::parse_ipv6(std::string_view input) {
   }
   host = ada::serializers::ipv6(address);
   ada_log("parse_ipv6 ", *host);
+  host_type = IPV6;
   return true;
 }
 
@@ -14020,6 +14022,7 @@ final:
     update_base_hostname(
         ada::serializers::ipv4(ipv4));  // We have to reserialize the address.
   }
+  host_type = IPV4;
   ADA_ASSERT_TRUE(validate());
   return true;
 }
@@ -14255,6 +14258,7 @@ bool url_aggregator::parse_ipv6(std::string_view input) {
   update_base_hostname(ada::serializers::ipv6(address));
   ada_log("parse_ipv6 ", get_hostname());
   ADA_ASSERT_TRUE(validate());
+  host_type = IPV6;
   return true;
 }
 
@@ -15004,6 +15008,14 @@ ada_string ada_get_protocol(ada_url result) noexcept {
   }
   std::string_view out = r->get_protocol();
   return ada_string_create(out.data(), out.length());
+}
+
+uint8_t ada_get_url_host_type(ada_url result) noexcept {
+  ada::result<ada::url_aggregator>& r = get_instance(result);
+  if (!r) {
+    return 0;
+  }
+  return r->host_type;
 }
 
 bool ada_set_href(ada_url result, const char* input, size_t length) noexcept {
