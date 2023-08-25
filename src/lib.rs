@@ -48,7 +48,7 @@ pub enum Error {
 }
 
 /// A parsed URL struct according to WHATWG URL specification.
-#[derive(Eq)]
+#[derive(Eq, Clone)]
 pub struct Url {
     url: *mut ffi::ada_url,
 }
@@ -416,6 +416,8 @@ impl<'de> serde::Deserialize<'de> for Url {
     }
 }
 
+unsafe impl Send for Url {}
+
 /// URLs compare like their stringification.
 impl PartialEq for Url {
     fn eq(&self, other: &Self) -> bool {
@@ -456,6 +458,12 @@ impl borrow::Borrow<[u8]> for Url {
 impl AsRef<[u8]> for Url {
     fn as_ref(&self) -> &[u8] {
         self.href().as_bytes()
+    }
+}
+
+impl Into<String> for Url {
+    fn into(self) -> String {
+        self.href().to_owned()
     }
 }
 
