@@ -121,10 +121,10 @@ impl Url {
     /// ```
     /// use ada_url::Url;
     ///
-    /// let mut url = Url::parse("blob:https://example.com/foo", None).expect("Invalid URL");
+    /// let url = Url::parse("blob:https://example.com/foo", None).expect("Invalid URL");
     /// assert_eq!(url.origin(), "https://example.com");
     /// ```
-    pub fn origin(&mut self) -> &str {
+    pub fn origin(&self) -> &str {
         unsafe {
             let out = ffi::ada_get_origin(self.url);
             let slice = std::slice::from_raw_parts(out.data.cast(), out.length);
