@@ -578,7 +578,6 @@ mod test {
         ];
         for (value, expected) in tests {
             let url = Url::parse(value, None).expect("Should have parsed url");
-            assert_eq!(format!("{}", url), expected);
             assert_eq!(url.to_string(), expected);
         }
     }
