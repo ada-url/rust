@@ -579,6 +579,10 @@ mod test {
                 "HTTP://EXAMPLE.COM/FOO/BAR?K1=V1&K2=V2",
                 "http://example.com/FOO/BAR?K1=V1&K2=V2",
             ),
+            (
+                "http://example.com/🦀/❤️/",
+                "http://example.com/%F0%9F%A6%80/%E2%9D%A4%EF%B8%8F/",
+            ),
         ];
         for (value, expected) in tests {
             eprintln!("{value} -> {expected}");
