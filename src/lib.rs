@@ -35,6 +35,7 @@ pub mod ffi;
 mod idna;
 pub use idna::Idna;
 
+use std::os::raw::c_uint;
 use std::{borrow, fmt, hash, ops};
 use thiserror::Error;
 
@@ -45,6 +46,25 @@ extern crate serde;
 pub enum Error {
     #[error("Invalid url: \"{0}\"")]
     ParseUrl(String),
+}
+
+/// Defines the type of the host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HostType {
+    Domain = 0,
+    IPV4 = 1,
+    IPV6 = 2,
+}
+
+impl From<c_uint> for HostType {
+    fn from(value: c_uint) -> Self {
+        match value {
+            0 => HostType::Domain,
+            1 => HostType::IPV4,
+            2 => HostType::IPV6,
+            _ => HostType::Domain,
+        }
+    }
 }
 
 /// A parsed URL struct according to WHATWG URL specification.
@@ -112,6 +132,11 @@ impl Url {
                 ffi::ada_can_parse(input.as_ptr().cast(), input.len())
             }
         }
+    }
+
+    /// Returns the type of the host such as default, ipv4 or ipv6.
+    pub fn host_type(&self) -> HostType {
+        HostType::from(unsafe { ffi::ada_get_url_host_type(self.url) })
     }
 
     /// Return the origin of this URL
@@ -699,6 +724,8 @@ mod test {
         assert!(out.has_search());
         assert!(out.has_hash());
         assert!(out.has_password());
+
+        assert_eq!(out.host_type(), HostType::Domain);
     }
 
     #[test]
