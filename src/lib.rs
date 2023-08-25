@@ -584,6 +584,10 @@ mod test {
                 "http://example.com/%F0%9F%A6%80/%E2%9D%A4%EF%B8%8F/",
             ),
             (
+                "https://example.org/hello world.html",
+                "https://example.org/hello%20world.html",
+            ),
+            (
                 "https://三十六計.org/走為上策/",
                 "https://xn--ehq95fdxbx86i.org/%E8%B5%B0%E7%82%BA%E4%B8%8A%E7%AD%96/", // weird, but this PR cannot change the implementation
             ),
