@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "ada-url"
-version = "1.4.1"
+version = "1.4.2"
 dependencies = [
  "cc",
  "criterion",
