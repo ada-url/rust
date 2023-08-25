@@ -461,9 +461,9 @@ impl AsRef<[u8]> for Url {
     }
 }
 
-impl Into<String> for Url {
-    fn into(self) -> String {
-        self.href().to_owned()
+impl From<Url> for String {
+    fn from(val: Url) -> Self {
+        val.href().to_owned()
     }
 }
 
