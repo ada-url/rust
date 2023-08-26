@@ -1,4 +1,4 @@
-/* auto-generated on 2023-08-25 15:25:45 -0400. Do not edit! */
+/* auto-generated on 2023-08-26 17:38:28 -0400. Do not edit! */
 /* begin file include/ada.h */
 /**
  * @file ada.h
@@ -6922,14 +6922,14 @@ inline void url_search_params::sort() {
 #ifndef ADA_ADA_VERSION_H
 #define ADA_ADA_VERSION_H
 
-#define ADA_VERSION "2.6.2"
+#define ADA_VERSION "2.6.3"
 
 namespace ada {
 
 enum {
   ADA_VERSION_MAJOR = 2,
   ADA_VERSION_MINOR = 6,
-  ADA_VERSION_REVISION = 2,
+  ADA_VERSION_REVISION = 3,
 };
 
 }  // namespace ada

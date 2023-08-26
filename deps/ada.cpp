@@ -1,4 +1,4 @@
-/* auto-generated on 2023-08-25 15:25:45 -0400. Do not edit! */
+/* auto-generated on 2023-08-26 17:38:28 -0400. Do not edit! */
 /* begin file src/ada.cpp */
 #include "ada.h"
 /* begin file src/checkers.cpp */
@@ -14891,6 +14891,11 @@ void ada_free(ada_url result) noexcept {
   ada::result<ada::url_aggregator>* r =
       (ada::result<ada::url_aggregator>*)result;
   delete r;
+}
+
+ada_url ada_copy(ada_url input) noexcept {
+  ada::result<ada::url_aggregator>& r = get_instance(input);
+  return new ada::result<ada::url_aggregator>(r);
 }
 
 bool ada_is_valid(ada_url result) noexcept {

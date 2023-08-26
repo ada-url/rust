@@ -39,6 +39,7 @@ use std::os::raw::c_uint;
 use std::{borrow, fmt, hash, ops};
 use thiserror::Error;
 
+extern crate alloc;
 #[cfg(feature = "serde")]
 extern crate serde;
 
@@ -68,9 +69,19 @@ impl From<c_uint> for HostType {
 }
 
 /// A parsed URL struct according to WHATWG URL specification.
-#[derive(Eq, Clone)]
+#[derive(Eq)]
 pub struct Url {
     url: *mut ffi::ada_url,
+}
+
+/// Clone trait by default uses bit-wise copy.
+/// In Rust, FFI requires deep copy, which requires an additional/inexpensive FFI call.
+impl Clone for Url {
+    fn clone(&self) -> Self {
+        Url {
+            url: unsafe { ffi::ada_copy(self.url) },
+        }
+    }
 }
 
 impl Drop for Url {
@@ -748,5 +759,15 @@ mod test {
 
         let deserialized: Url = serde_json::from_str(&output).unwrap();
         assert_eq!(deserialized.href(), input.to_string() + "/");
+    }
+
+    #[test]
+    fn should_clone() {
+        let first = Url::parse("https://lemire.me", None).unwrap();
+        let mut second = first.clone();
+        second.set_href("https://yagiz.co");
+        assert_ne!(first.href(), second.href());
+        assert_eq!(first.href(), "https://lemire.me/");
+        assert_eq!(second.href(), "https://yagiz.co/");
     }
 }
