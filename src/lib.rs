@@ -35,8 +35,7 @@ pub mod ffi;
 mod idna;
 pub use idna::Idna;
 
-use std::os::raw::c_uint;
-use std::{borrow, fmt, hash, ops};
+use std::{borrow, fmt, hash, ops, os::raw::c_uint};
 use thiserror::Error;
 
 extern crate alloc;
@@ -70,23 +69,25 @@ impl From<c_uint> for HostType {
 
 /// A parsed URL struct according to WHATWG URL specification.
 #[derive(Eq)]
-pub struct Url {
-    url: *mut ffi::ada_url,
-}
+pub struct Url(*mut ffi::ada_url);
 
 /// Clone trait by default uses bit-wise copy.
 /// In Rust, FFI requires deep copy, which requires an additional/inexpensive FFI call.
 impl Clone for Url {
     fn clone(&self) -> Self {
-        Url {
-            url: unsafe { ffi::ada_copy(self.url) },
-        }
+        unsafe { ffi::ada_copy(self.0).into() }
     }
 }
 
 impl Drop for Url {
     fn drop(&mut self) {
-        unsafe { ffi::ada_free(self.url) }
+        unsafe { ffi::ada_free(self.0) }
+    }
+}
+
+impl From<*mut ffi::ada_url> for Url {
+    fn from(value: *mut ffi::ada_url) -> Self {
+        Self { 0: value }
     }
 }
 
@@ -113,9 +114,7 @@ impl Url {
         };
 
         if unsafe { ffi::ada_is_valid(url_aggregator) } {
-            Ok(Url {
-                url: url_aggregator,
-            })
+            Ok(url_aggregator.into())
         } else {
             Err(Error::ParseUrl(input.to_owned()))
         }
@@ -147,7 +146,7 @@ impl Url {
 
     /// Returns the type of the host such as default, ipv4 or ipv6.
     pub fn host_type(&self) -> HostType {
-        HostType::from(unsafe { ffi::ada_get_url_host_type(self.url) })
+        HostType::from(unsafe { ffi::ada_get_url_host_type(self.0) })
     }
 
     /// Return the origin of this URL
@@ -162,7 +161,7 @@ impl Url {
     /// ```
     pub fn origin(&self) -> &str {
         unsafe {
-            let out = ffi::ada_get_origin(self.url);
+            let out = ffi::ada_get_origin(self.0);
             let slice = std::slice::from_raw_parts(out.data.cast(), out.length);
             std::str::from_utf8_unchecked(slice)
         }
@@ -172,11 +171,11 @@ impl Url {
     ///
     /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-href)
     pub fn href(&self) -> &str {
-        unsafe { ffi::ada_get_href(self.url) }.as_str()
+        unsafe { ffi::ada_get_href(self.0) }.as_str()
     }
 
     pub fn set_href(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_href(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_href(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return the username for this URL as a percent-encoded ASCII string.
@@ -190,11 +189,11 @@ impl Url {
     /// assert_eq!(url.username(), "rms");
     /// ```
     pub fn username(&self) -> &str {
-        unsafe { ffi::ada_get_username(self.url) }.as_str()
+        unsafe { ffi::ada_get_username(self.0) }.as_str()
     }
 
     pub fn set_username(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_username(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_username(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return the password for this URL, if any, as a percent-encoded ASCII string.
@@ -208,11 +207,11 @@ impl Url {
     /// assert_eq!(url.password(), "secret123");
     /// ```
     pub fn password(&self) -> &str {
-        unsafe { ffi::ada_get_password(self.url) }.as_str()
+        unsafe { ffi::ada_get_password(self.0) }.as_str()
     }
 
     pub fn set_password(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_password(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_password(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return the port number for this URL, or an empty string.
@@ -229,11 +228,11 @@ impl Url {
     /// assert_eq!(url.port(), "8080");
     /// ```
     pub fn port(&self) -> &str {
-        unsafe { ffi::ada_get_port(self.url) }.as_str()
+        unsafe { ffi::ada_get_port(self.0) }.as_str()
     }
 
     pub fn set_port(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_port(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_port(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return this URL’s fragment identifier, or an empty string.
@@ -254,11 +253,11 @@ impl Url {
     /// assert!(url.has_hash());
     /// ```
     pub fn hash(&self) -> &str {
-        unsafe { ffi::ada_get_hash(self.url) }.as_str()
+        unsafe { ffi::ada_get_hash(self.0) }.as_str()
     }
 
     pub fn set_hash(&mut self, input: &str) {
-        unsafe { ffi::ada_set_hash(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_hash(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return the parsed representation of the host for this URL with an optional port number.
@@ -272,11 +271,11 @@ impl Url {
     /// assert_eq!(url.host(), "127.0.0.1:8080");
     /// ```
     pub fn host(&self) -> &str {
-        unsafe { ffi::ada_get_host(self.url) }.as_str()
+        unsafe { ffi::ada_get_host(self.0) }.as_str()
     }
 
     pub fn set_host(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_host(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_host(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return the parsed representation of the host for this URL. Non-ASCII domain labels are
@@ -294,11 +293,11 @@ impl Url {
     /// assert_eq!(url.hostname(), "127.0.0.1");
     /// ```
     pub fn hostname(&self) -> &str {
-        unsafe { ffi::ada_get_hostname(self.url) }.as_str()
+        unsafe { ffi::ada_get_hostname(self.0) }.as_str()
     }
 
     pub fn set_hostname(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_hostname(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_hostname(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return the path for this URL, as a percent-encoded ASCII string.
@@ -312,11 +311,11 @@ impl Url {
     /// assert_eq!(url.pathname(), "/api/versions");
     /// ```
     pub fn pathname(&self) -> &str {
-        unsafe { ffi::ada_get_pathname(self.url) }.as_str()
+        unsafe { ffi::ada_get_pathname(self.0) }.as_str()
     }
 
     pub fn set_pathname(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_pathname(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_pathname(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return this URL’s query string, if any, as a percent-encoded ASCII string.
@@ -333,11 +332,11 @@ impl Url {
     /// assert_eq!(url.search(), "");
     /// ```
     pub fn search(&self) -> &str {
-        unsafe { ffi::ada_get_search(self.url) }.as_str()
+        unsafe { ffi::ada_get_search(self.0) }.as_str()
     }
 
     pub fn set_search(&mut self, input: &str) {
-        unsafe { ffi::ada_set_search(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_search(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// Return the scheme of this URL, lower-cased, as an ASCII string with the ‘:’ delimiter.
@@ -351,50 +350,50 @@ impl Url {
     /// assert_eq!(url.protocol(), "file:");
     /// ```
     pub fn protocol(&self) -> &str {
-        unsafe { ffi::ada_get_protocol(self.url) }.as_str()
+        unsafe { ffi::ada_get_protocol(self.0) }.as_str()
     }
 
     pub fn set_protocol(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_protocol(self.url, input.as_ptr().cast(), input.len()) }
+        unsafe { ffi::ada_set_protocol(self.0, input.as_ptr().cast(), input.len()) }
     }
 
     /// A URL includes credentials if its username or password is not the empty string.
     pub fn has_credentials(&self) -> bool {
-        unsafe { ffi::ada_has_credentials(self.url) }
+        unsafe { ffi::ada_has_credentials(self.0) }
     }
 
     /// Returns true if it has an host but it is the empty string.
     pub fn has_empty_hostname(&self) -> bool {
-        unsafe { ffi::ada_has_empty_hostname(self.url) }
+        unsafe { ffi::ada_has_empty_hostname(self.0) }
     }
 
     /// Returns true if it has a host (included an empty host)
     pub fn has_hostname(&self) -> bool {
-        unsafe { ffi::ada_has_hostname(self.url) }
+        unsafe { ffi::ada_has_hostname(self.0) }
     }
 
     pub fn has_non_empty_username(&self) -> bool {
-        unsafe { ffi::ada_has_non_empty_username(self.url) }
+        unsafe { ffi::ada_has_non_empty_username(self.0) }
     }
 
     pub fn has_non_empty_password(&self) -> bool {
-        unsafe { ffi::ada_has_non_empty_password(self.url) }
+        unsafe { ffi::ada_has_non_empty_password(self.0) }
     }
 
     pub fn has_port(&self) -> bool {
-        unsafe { ffi::ada_has_port(self.url) }
+        unsafe { ffi::ada_has_port(self.0) }
     }
 
     pub fn has_password(&self) -> bool {
-        unsafe { ffi::ada_has_password(self.url) }
+        unsafe { ffi::ada_has_password(self.0) }
     }
 
     pub fn has_hash(&self) -> bool {
-        unsafe { ffi::ada_has_hash(self.url) }
+        unsafe { ffi::ada_has_hash(self.0) }
     }
 
     pub fn has_search(&self) -> bool {
-        unsafe { ffi::ada_has_search(self.url) }
+        unsafe { ffi::ada_has_search(self.0) }
     }
     /// Returns the parsed version of the URL with all components.
     ///
@@ -510,7 +509,7 @@ impl From<Url> for String {
 impl fmt::Debug for Url {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
-            let components = ffi::ada_get_components(self.url).as_ref().unwrap();
+            let components = ffi::ada_get_components(self.0).as_ref().unwrap();
             let mut debug = f.debug_struct("Url");
             debug
                 .field("href", &self.href())
