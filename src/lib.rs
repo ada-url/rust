@@ -67,6 +67,66 @@ impl From<c_uint> for HostType {
     }
 }
 
+/// By using 32-bit integers, we implicitly assume that the URL string
+/// cannot exceed 4 GB.
+///
+/// https://user:pass@example.com:1234/foo/bar?baz#quux
+///       |     |    |          | ^^^^|       |   |
+///       |     |    |          | |   |       |   `----- hash_start
+///       |     |    |          | |   |       `--------- search_start
+///       |     |    |          | |   `----------------- pathname_start
+///       |     |    |          | `--------------------- port
+///       |     |    |          `----------------------- host_end
+///       |     |    `---------------------------------- host_start
+///       |     `--------------------------------------- username_end
+///       `--------------------------------------------- protocol_end
+#[derive(Debug)]
+pub struct UrlComponents {
+    pub protocol_end: u32,
+    pub username_end: u32,
+    pub host_start: u32,
+    pub host_end: u32,
+    pub port: Option<u32>,
+    pub pathname_start: Option<u32>,
+    pub search_start: Option<u32>,
+    pub hash_start: Option<u32>,
+}
+
+impl From<&ffi::ada_url_components> for UrlComponents {
+    fn from(value: &ffi::ada_url_components) -> Self {
+        let port = if value.port == u32::MAX {
+            None
+        } else {
+            Some(value.port)
+        };
+        let pathname_start = if value.pathname_start == u32::MAX {
+            None
+        } else {
+            Some(value.pathname_start)
+        };
+        let search_start = if value.search_start == u32::MAX {
+            None
+        } else {
+            Some(value.search_start)
+        };
+        let hash_start = if value.hash_start == u32::MAX {
+            None
+        } else {
+            Some(value.hash_start)
+        };
+        Self {
+            protocol_end: value.protocol_end,
+            username_end: value.username_end,
+            host_start: value.host_start,
+            host_end: value.host_end,
+            port,
+            pathname_start,
+            search_start,
+            hash_start,
+        }
+    }
+}
+
 /// A parsed URL struct according to WHATWG URL specification.
 #[derive(Eq)]
 pub struct Url(*mut ffi::ada_url);
@@ -87,7 +147,7 @@ impl Drop for Url {
 
 impl From<*mut ffi::ada_url> for Url {
     fn from(value: *mut ffi::ada_url) -> Self {
-        Self { 0: value }
+        Self(value)
     }
 }
 
@@ -395,11 +455,17 @@ impl Url {
     pub fn has_search(&self) -> bool {
         unsafe { ffi::ada_has_search(self.0) }
     }
+
     /// Returns the parsed version of the URL with all components.
     ///
     /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-href)
     pub fn as_str(&self) -> &str {
         self.href()
+    }
+
+    /// Returns the URL components of the instance.
+    pub fn components(&self) -> UrlComponents {
+        unsafe { ffi::ada_get_components(self.0).as_ref().unwrap() }.into()
     }
 }
 
@@ -508,48 +574,10 @@ impl From<Url> for String {
 
 impl fmt::Debug for Url {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unsafe {
-            let components = ffi::ada_get_components(self.0).as_ref().unwrap();
-            let mut debug = f.debug_struct("Url");
-            debug
-                .field("href", &self.href())
-                .field("protocol_end", &components.protocol_end)
-                .field("host_start", &components.host_start)
-                .field("host_end", &components.host_end);
-            let port = if components.port == u32::MAX {
-                None
-            } else {
-                Some(components.port)
-            };
-            let username_end = if components.username_end == u32::MAX {
-                None
-            } else {
-                Some(components.username_end)
-            };
-            let search_start = if components.search_start == u32::MAX {
-                None
-            } else {
-                Some(components.search_start)
-            };
-            let hash_start = if components.hash_start == u32::MAX {
-                None
-            } else {
-                Some(components.hash_start)
-            };
-            let pathname_start = if components.pathname_start == u32::MAX {
-                None
-            } else {
-                Some(components.pathname_start)
-            };
-
-            debug
-                .field("port", &port)
-                .field("username_end", &username_end)
-                .field("search_start", &search_start)
-                .field("hash_start", &hash_start)
-                .field("pathname_start", &pathname_start)
-                .finish()
-        }
+        f.debug_struct("Url")
+            .field("href", &self.href())
+            .field("components", &self.components())
+            .finish()
     }
 }
 
