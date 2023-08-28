@@ -67,6 +67,10 @@ impl From<c_uint> for HostType {
     }
 }
 
+/// Components are a serialization-free representation of a URL.
+/// For usages where string serialization has a high cost, you can
+/// use url components with `href` attribute.
+///
 /// By using 32-bit integers, we implicitly assume that the URL string
 /// cannot exceed 4 GB.
 ///
@@ -234,6 +238,16 @@ impl Url {
         unsafe { ffi::ada_get_href(self.0) }.as_str()
     }
 
+    /// Updates the href of the URL, and triggers the URL parser.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_href("https://lemire.me"));
+    /// assert_eq!(url.href(), "https://lemire.me/");
+    /// ```
     pub fn set_href(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_href(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -252,6 +266,16 @@ impl Url {
         unsafe { ffi::ada_get_username(self.0) }.as_str()
     }
 
+    /// Updates the `username` of the URL.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_username("username"));
+    /// assert_eq!(url.href(), "https://username@yagiz.co/");
+    /// ```
     pub fn set_username(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_username(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -270,6 +294,16 @@ impl Url {
         unsafe { ffi::ada_get_password(self.0) }.as_str()
     }
 
+    /// Updates the `password` of the URL.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_password("password"));
+    /// assert_eq!(url.href(), "https://:password@yagiz.co/");
+    /// ```
     pub fn set_password(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_password(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -291,6 +325,16 @@ impl Url {
         unsafe { ffi::ada_get_port(self.0) }.as_str()
     }
 
+    /// Updates the `port` of the URL.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_port("8080"));
+    /// assert_eq!(url.href(), "https://yagiz.co:8080/");
+    /// ```
     pub fn set_port(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_port(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -316,6 +360,15 @@ impl Url {
         unsafe { ffi::ada_get_hash(self.0) }.as_str()
     }
 
+    /// Updates the `hash` of the URL.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// url.set_hash("this-is-my-hash");
+    /// assert_eq!(url.href(), "https://yagiz.co/#this-is-my-hash");
+    /// ```
     pub fn set_hash(&mut self, input: &str) {
         unsafe { ffi::ada_set_hash(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -334,6 +387,16 @@ impl Url {
         unsafe { ffi::ada_get_host(self.0) }.as_str()
     }
 
+    /// Updates the `host` of the URL.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_host("localhost:3000"));
+    /// assert_eq!(url.href(), "https://localhost:3000/");
+    /// ```
     pub fn set_host(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_host(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -356,6 +419,16 @@ impl Url {
         unsafe { ffi::ada_get_hostname(self.0) }.as_str()
     }
 
+    /// Updates the `hostname` of the URL.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_hostname("localhost"));
+    /// assert_eq!(url.href(), "https://localhost/");
+    /// ```
     pub fn set_hostname(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_hostname(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -374,6 +447,16 @@ impl Url {
         unsafe { ffi::ada_get_pathname(self.0) }.as_str()
     }
 
+    /// Updates the `pathname` of the URL.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_pathname("/contact"));
+    /// assert_eq!(url.href(), "https://yagiz.co/contact");
+    /// ```
     pub fn set_pathname(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_pathname(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -395,6 +478,15 @@ impl Url {
         unsafe { ffi::ada_get_search(self.0) }.as_str()
     }
 
+    /// Updates the `search` of the URL.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
+    /// url.set_search("?page=1");
+    /// assert_eq!(url.href(), "https://yagiz.co/?page=1");
+    /// ```
     pub fn set_search(&mut self, input: &str) {
         unsafe { ffi::ada_set_search(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -413,6 +505,16 @@ impl Url {
         unsafe { ffi::ada_get_protocol(self.0) }.as_str()
     }
 
+    /// Updates the `protocol` of the URL.
+    /// Returns true if operation is successful.
+    ///
+    /// ```
+    /// use ada_url::Url;
+    ///
+    /// let mut url = Url::parse("http://yagiz.co", None).expect("Invalid URL");
+    /// assert!(url.set_protocol("http"));
+    /// assert_eq!(url.href(), "http://yagiz.co/");
+    /// ```
     pub fn set_protocol(&mut self, input: &str) -> bool {
         unsafe { ffi::ada_set_protocol(self.0, input.as_ptr().cast(), input.len()) }
     }
@@ -432,26 +534,32 @@ impl Url {
         unsafe { ffi::ada_has_hostname(self.0) }
     }
 
+    /// Returns true if URL has a non-empty username.
     pub fn has_non_empty_username(&self) -> bool {
         unsafe { ffi::ada_has_non_empty_username(self.0) }
     }
 
+    /// Returns true if URL has a non-empty pasword.
     pub fn has_non_empty_password(&self) -> bool {
         unsafe { ffi::ada_has_non_empty_password(self.0) }
     }
 
+    /// Returns true if URL has a port.
     pub fn has_port(&self) -> bool {
         unsafe { ffi::ada_has_port(self.0) }
     }
 
+    /// Returns true if URL has password.
     pub fn has_password(&self) -> bool {
         unsafe { ffi::ada_has_password(self.0) }
     }
 
+    /// Returns true if URL has a hash/fragment.
     pub fn has_hash(&self) -> bool {
         unsafe { ffi::ada_has_hash(self.0) }
     }
 
+    /// Returns true if URL has search/query.
     pub fn has_search(&self) -> bool {
         unsafe { ffi::ada_has_search(self.0) }
     }
