@@ -74,6 +74,7 @@ impl From<c_uint> for HostType {
 /// By using 32-bit integers, we implicitly assume that the URL string
 /// cannot exceed 4 GB.
 ///
+/// ```text
 /// https://user:pass@example.com:1234/foo/bar?baz#quux
 ///       |     |    |          | ^^^^|       |   |
 ///       |     |    |          | |   |       |   `----- hash_start
@@ -84,6 +85,7 @@ impl From<c_uint> for HostType {
 ///       |     |    `---------------------------------- host_start
 ///       |     `--------------------------------------- username_end
 ///       `--------------------------------------------- protocol_end
+/// ```
 #[derive(Debug)]
 pub struct UrlComponents {
     pub protocol_end: u32,
