@@ -141,6 +141,17 @@ impl From<*mut ffi::ada_url> for Url {
     }
 }
 
+type SetterResult = Result<(), ()>;
+
+#[inline]
+fn setter_result(successful: bool) -> SetterResult {
+    if successful {
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
 impl Url {
     /// Parses the input with an optional base
     ///
@@ -225,17 +236,17 @@ impl Url {
     }
 
     /// Updates the href of the URL, and triggers the URL parser.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_href("https://lemire.me"));
+    /// url.set_href("https://lemire.me").unwrap();
     /// assert_eq!(url.href(), "https://lemire.me/");
     /// ```
-    pub fn set_href(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_href(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_href(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_href(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// Return the username for this URL as a percent-encoded ASCII string.
@@ -253,17 +264,17 @@ impl Url {
     }
 
     /// Updates the `username` of the URL.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_username("username"));
+    /// url.set_username("username").unwrap();
     /// assert_eq!(url.href(), "https://username@yagiz.co/");
     /// ```
-    pub fn set_username(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_username(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_username(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_username(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// Return the password for this URL, if any, as a percent-encoded ASCII string.
@@ -281,17 +292,17 @@ impl Url {
     }
 
     /// Updates the `password` of the URL.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_password("password"));
+    /// url.set_password("password").unwrap();
     /// assert_eq!(url.href(), "https://:password@yagiz.co/");
     /// ```
-    pub fn set_password(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_password(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_password(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_password(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// Return the port number for this URL, or an empty string.
@@ -312,17 +323,17 @@ impl Url {
     }
 
     /// Updates the `port` of the URL.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_port("8080"));
+    /// url.set_port("8080").unwrap();
     /// assert_eq!(url.href(), "https://yagiz.co:8080/");
     /// ```
-    pub fn set_port(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_port(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_port(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_port(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// Return this URL’s fragment identifier, or an empty string.
@@ -374,17 +385,17 @@ impl Url {
     }
 
     /// Updates the `host` of the URL.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_host("localhost:3000"));
+    /// url.set_host("localhost:3000").unwrap();
     /// assert_eq!(url.href(), "https://localhost:3000/");
     /// ```
-    pub fn set_host(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_host(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_host(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_host(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// Return the parsed representation of the host for this URL. Non-ASCII domain labels are
@@ -406,17 +417,17 @@ impl Url {
     }
 
     /// Updates the `hostname` of the URL.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_hostname("localhost"));
+    /// url.set_hostname("localhost").unwrap();
     /// assert_eq!(url.href(), "https://localhost/");
     /// ```
-    pub fn set_hostname(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_hostname(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_hostname(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_hostname(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// Return the path for this URL, as a percent-encoded ASCII string.
@@ -434,17 +445,17 @@ impl Url {
     }
 
     /// Updates the `pathname` of the URL.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("https://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_pathname("/contact"));
+    /// url.set_pathname("/contact").unwrap();
     /// assert_eq!(url.href(), "https://yagiz.co/contact");
     /// ```
-    pub fn set_pathname(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_pathname(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_pathname(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_pathname(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// Return this URL’s query string, if any, as a percent-encoded ASCII string.
@@ -492,17 +503,17 @@ impl Url {
     }
 
     /// Updates the `protocol` of the URL.
-    /// Returns true if operation is successful.
     ///
     /// ```
     /// use ada_url::Url;
     ///
     /// let mut url = Url::parse("http://yagiz.co", None).expect("Invalid URL");
-    /// assert!(url.set_protocol("http"));
+    /// url.set_protocol("http").unwrap();
     /// assert_eq!(url.href(), "http://yagiz.co/");
     /// ```
-    pub fn set_protocol(&mut self, input: &str) -> bool {
-        unsafe { ffi::ada_set_protocol(self.0, input.as_ptr().cast(), input.len()) }
+    #[allow(clippy::result_unit_err)]
+    pub fn set_protocol(&mut self, input: &str) -> SetterResult {
+        setter_result(unsafe { ffi::ada_set_protocol(self.0, input.as_ptr().cast(), input.len()) })
     }
 
     /// A URL includes credentials if its username or password is not the empty string.
@@ -827,31 +838,31 @@ mod test {
             "https://username:password@google.com:9090/search?query#hash"
         );
 
-        assert!(out.set_username("new-username"));
+        out.set_username("new-username").unwrap();
         assert_eq!(out.username(), "new-username");
 
-        assert!(out.set_password("new-password"));
+        out.set_password("new-password").unwrap();
         assert_eq!(out.password(), "new-password");
 
-        assert!(out.set_port("4242"));
+        out.set_port("4242").unwrap();
         assert_eq!(out.port(), "4242");
 
         out.set_hash("#new-hash");
         assert_eq!(out.hash(), "#new-hash");
 
-        assert!(out.set_host("yagiz.co:9999"));
+        out.set_host("yagiz.co:9999").unwrap();
         assert_eq!(out.host(), "yagiz.co:9999");
 
-        assert!(out.set_hostname("domain.com"));
+        out.set_hostname("domain.com").unwrap();
         assert_eq!(out.hostname(), "domain.com");
 
-        assert!(out.set_pathname("/new-search"));
+        out.set_pathname("/new-search").unwrap();
         assert_eq!(out.pathname(), "/new-search");
 
         out.set_search("updated-query");
         assert_eq!(out.search(), "?updated-query");
 
-        out.set_protocol("wss");
+        out.set_protocol("wss").unwrap();
         assert_eq!(out.protocol(), "wss:");
 
         assert!(out.has_credentials());
@@ -886,7 +897,7 @@ mod test {
     fn should_clone() {
         let first = Url::parse("https://lemire.me", None).unwrap();
         let mut second = first.clone();
-        second.set_href("https://yagiz.co");
+        second.set_href("https://yagiz.co").unwrap();
         assert_ne!(first.href(), second.href());
         assert_eq!(first.href(), "https://lemire.me/");
         assert_eq!(second.href(), "https://yagiz.co/");
