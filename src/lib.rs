@@ -42,10 +42,12 @@ extern crate alloc;
 #[cfg(feature = "serde")]
 extern crate serde;
 
+/// Error type of [`Url::parse`].
 #[derive(Debug, Display, Error, PartialEq, Eq)]
 #[display(bound = "Input: std::fmt::Debug")]
 #[display(fmt = "Invalid url: {input:?}")]
 pub struct ParseUrlError<Input> {
+    /// The invalid input that caused the error.
     pub input: Input,
 }
 
