@@ -28,7 +28,7 @@ libcpp = []
 serde = ["dep:serde"]
 
 [dependencies]
-thiserror = "1"
+derive_more = "0.99.17"
 serde = { version = "1.0", optional = true, features = ["derive"] }
 
 [dev-dependencies]

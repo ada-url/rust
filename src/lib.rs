@@ -35,17 +35,20 @@ pub mod ffi;
 mod idna;
 pub use idna::Idna;
 
+use derive_more::{Display, Error};
 use std::{borrow, fmt, hash, ops, os::raw::c_uint};
-use thiserror::Error;
 
 extern crate alloc;
 #[cfg(feature = "serde")]
 extern crate serde;
 
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum Error {
-    #[error("Invalid url: \"{0}\"")]
-    ParseUrl(String),
+/// Error type of [`Url::parse`].
+#[derive(Debug, Display, Error, PartialEq, Eq)]
+#[display(bound = "Input: std::fmt::Debug")]
+#[display(fmt = "Invalid url: {input:?}")]
+pub struct ParseUrlError<Input> {
+    /// The invalid input that caused the error.
+    pub input: Input,
 }
 
 /// Defines the type of the host.
@@ -161,23 +164,26 @@ impl Url {
     ///     .expect("This is a valid URL. Should have parsed it.");
     /// assert_eq!(out.protocol(), "https:");
     /// ```
-    pub fn parse(input: &str, base: Option<&str>) -> Result<Url, Error> {
+    pub fn parse<Input>(input: Input, base: Option<&str>) -> Result<Url, ParseUrlError<Input>>
+    where
+        Input: AsRef<str>,
+    {
         let url_aggregator = match base {
             Some(base) => unsafe {
                 ffi::ada_parse_with_base(
-                    input.as_ptr().cast(),
-                    input.len(),
+                    input.as_ref().as_ptr().cast(),
+                    input.as_ref().len(),
                     base.as_ptr().cast(),
                     base.len(),
                 )
             },
-            None => unsafe { ffi::ada_parse(input.as_ptr().cast(), input.len()) },
+            None => unsafe { ffi::ada_parse(input.as_ref().as_ptr().cast(), input.as_ref().len()) },
         };
 
         if unsafe { ffi::ada_is_valid(url_aggregator) } {
             Ok(url_aggregator.into())
         } else {
-            Err(Error::ParseUrl(input.to_owned()))
+            Err(ParseUrlError { input })
         }
     }
 
@@ -686,26 +692,26 @@ impl fmt::Debug for Url {
     }
 }
 
-impl TryFrom<&str> for Url {
-    type Error = Error;
+impl<'input> TryFrom<&'input str> for Url {
+    type Error = ParseUrlError<&'input str>;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'input str) -> Result<Self, Self::Error> {
         Self::parse(value, None)
     }
 }
 
 impl TryFrom<String> for Url {
-    type Error = Error;
+    type Error = ParseUrlError<String>;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::parse(&value, None)
+        Self::parse(value, None)
     }
 }
 
-impl TryFrom<&String> for Url {
-    type Error = Error;
+impl<'input> TryFrom<&'input String> for Url {
+    type Error = ParseUrlError<&'input String>;
 
-    fn try_from(value: &String) -> Result<Self, Self::Error> {
+    fn try_from(value: &'input String) -> Result<Self, Self::Error> {
         Self::parse(value, None)
     }
 }
@@ -730,10 +736,12 @@ impl fmt::Display for Url {
 }
 
 impl std::str::FromStr for Url {
-    type Err = Error;
+    type Err = ParseUrlError<Box<str>>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s, None)
+        Self::parse(s, None).map_err(|ParseUrlError { input }| ParseUrlError {
+            input: input.into(),
+        })
     }
 }
 
@@ -789,7 +797,7 @@ mod test {
         dbg!(&url);
         let error = url.unwrap_err();
         assert_eq!(error.to_string(), r#"Invalid url: "this is not a url""#);
-        assert!(matches!(error, Error::ParseUrl(_)));
+        assert_eq!(error.input, "this is not a url");
     }
 
     #[test]
