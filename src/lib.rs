@@ -523,7 +523,7 @@ impl Url {
         unsafe { ffi::ada_has_non_empty_username(self.0) }
     }
 
-    /// Returns true if URL has a non-empty pasword.
+    /// Returns true if URL has a non-empty password.
     pub fn has_non_empty_password(&self) -> bool {
         unsafe { ffi::ada_has_non_empty_password(self.0) }
     }
