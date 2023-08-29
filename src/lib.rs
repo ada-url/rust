@@ -46,7 +46,7 @@ extern crate serde;
 #[display(bound = "Input: std::fmt::Debug")]
 #[display(fmt = "Invalid url: {input:?}")]
 pub struct ParseUrlError<Input> {
-    input: Input,
+    pub input: Input,
 }
 
 /// Defines the type of the host.
@@ -782,6 +782,7 @@ mod test {
         dbg!(&url);
         let error = url.unwrap_err();
         assert_eq!(error.to_string(), r#"Invalid url: "this is not a url""#);
+        assert_eq!(error.input, "this is not a url");
     }
 
     #[test]
