@@ -98,26 +98,10 @@ pub struct UrlComponents {
 
 impl From<&ffi::ada_url_components> for UrlComponents {
     fn from(value: &ffi::ada_url_components) -> Self {
-        let port = if value.port == u32::MAX {
-            None
-        } else {
-            Some(value.port)
-        };
-        let pathname_start = if value.pathname_start == u32::MAX {
-            None
-        } else {
-            Some(value.pathname_start)
-        };
-        let search_start = if value.search_start == u32::MAX {
-            None
-        } else {
-            Some(value.search_start)
-        };
-        let hash_start = if value.hash_start == u32::MAX {
-            None
-        } else {
-            Some(value.hash_start)
-        };
+        let port = (value.port != u32::MAX).then_some(value.port);
+        let pathname_start = (value.pathname_start != u32::MAX).then_some(value.pathname_start);
+        let search_start = (value.search_start != u32::MAX).then_some(value.search_start);
+        let hash_start = (value.hash_start != u32::MAX).then_some(value.hash_start);
         Self {
             protocol_end: value.protocol_end,
             username_end: value.username_end,
