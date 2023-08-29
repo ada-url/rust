@@ -18,8 +18,8 @@ impl Idna {
     pub fn unicode(input: &str) -> &str {
         unsafe {
             let out = ffi::ada_idna_to_unicode(input.as_ptr().cast(), input.len());
-            let slice = std::slice::from_raw_parts(out.data.cast(), out.length);
-            std::str::from_utf8_unchecked(slice)
+            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
+            core::str::from_utf8_unchecked(slice)
         }
     }
 
@@ -35,8 +35,8 @@ impl Idna {
     pub fn ascii(input: &str) -> &str {
         unsafe {
             let out = ffi::ada_idna_to_ascii(input.as_ptr().cast(), input.len());
-            let slice = std::slice::from_raw_parts(out.data.cast(), out.length);
-            std::str::from_utf8_unchecked(slice)
+            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
+            core::str::from_utf8_unchecked(slice)
         }
     }
 }
