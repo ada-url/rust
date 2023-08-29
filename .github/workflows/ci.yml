@@ -55,6 +55,11 @@ jobs:
       - name: Cargo Test
         run: cargo test --all-targets --all-features
 
+      - name: Cargo Doc
+        env:
+          RUSTDOCFLAGS: '-D warnings'
+        run: cargo doc
+
   format:
     name: Format
     runs-on: ubuntu-latest
