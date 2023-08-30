@@ -82,7 +82,7 @@ extern "C" {
     pub fn ada_get_pathname(url: *mut ada_url) -> ada_string;
     pub fn ada_get_search(url: *mut ada_url) -> ada_string;
     pub fn ada_get_protocol(url: *mut ada_url) -> ada_string;
-    pub fn ada_get_url_host_type(url: *mut ada_url) -> c_uint;
+    pub fn ada_get_host_type(url: *mut ada_url) -> c_uint;
 
     // Setters
     pub fn ada_set_href(url: *mut ada_url, input: *const c_char, length: usize) -> bool;

@@ -212,7 +212,7 @@ impl Url {
 
     /// Returns the type of the host such as default, ipv4 or ipv6.
     pub fn host_type(&self) -> HostType {
-        HostType::from(unsafe { ffi::ada_get_url_host_type(self.0) })
+        HostType::from(unsafe { ffi::ada_get_host_type(self.0) })
     }
 
     /// Return the origin of this URL
