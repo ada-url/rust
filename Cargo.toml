@@ -12,8 +12,9 @@ description = "Fast WHATWG Compliant URL parser"
 documentation = "https://docs.rs/ada-url"
 readme = "README.md"
 keywords = ["url", "parser", "whatwg", "performance"]
-categories = ["parser-implementations", "web-programming", "encoding", "no-std::no-alloc", "no-std"]
-repository = "https://ada-url.com"
+categories = ["parser-implementations", "web-programming", "encoding", "parsing", "no-std::no-alloc", "no-std"]
+repository = "https://github.com/ada-url/rust"
+homepage = "https://ada-url.com"
 license = "MIT OR Apache-2.0"
 
 [[bench]]
