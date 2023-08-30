@@ -12,7 +12,7 @@ description = "Fast WHATWG Compliant URL parser"
 documentation = "https://docs.rs/ada-url"
 readme = "README.md"
 keywords = ["url", "parser", "whatwg", "performance"]
-categories = ["parser-implementations", "web-programming", "encoding"]
+categories = ["parser-implementations", "web-programming", "encoding", "no-std::no-alloc", "no-std"]
 repository = "https://ada-url.com"
 license = "MIT OR Apache-2.0"
 
@@ -22,10 +22,14 @@ path = "bench/parse.rs"
 harness = false
 
 [features]
+default = ["alloc", "std"]
 # pass `cpp_set_stdlib("c++")` to `cc`
 libcpp = []
 # enables serde serialization/deserialization support
-serde = ["dep:serde"]
+serde = ["dep:serde", "std"]
+# enable allocations
+alloc = []
+std = []
 
 [dependencies]
 derive_more = "0.99.17"
