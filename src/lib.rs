@@ -35,10 +35,9 @@ pub mod ffi;
 mod idna;
 pub use idna::Idna;
 
+use core::{borrow, ffi::c_uint, fmt, hash, ops};
 use derive_more::{Display, Error};
-use std::{borrow, fmt, hash, ops, os::raw::c_uint};
 
-extern crate alloc;
 #[cfg(feature = "serde")]
 extern crate serde;
 
@@ -229,8 +228,8 @@ impl Url {
     pub fn origin(&self) -> &str {
         unsafe {
             let out = ffi::ada_get_origin(self.0);
-            let slice = std::slice::from_raw_parts(out.data.cast(), out.length);
-            std::str::from_utf8_unchecked(slice)
+            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
+            core::str::from_utf8_unchecked(slice)
         }
     }
 

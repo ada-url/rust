@@ -1,5 +1,5 @@
 #![allow(non_camel_case_types)]
-use std::ffi::{c_char, c_uint};
+use core::ffi::{c_char, c_uint};
 
 #[repr(C)]
 pub struct ada_url {
@@ -16,8 +16,8 @@ pub struct ada_string {
 impl ada_string {
     pub fn as_str(&self) -> &'static str {
         unsafe {
-            let slice = std::slice::from_raw_parts(self.data.cast(), self.length);
-            std::str::from_utf8_unchecked(slice)
+            let slice = core::slice::from_raw_parts(self.data.cast(), self.length);
+            core::str::from_utf8_unchecked(slice)
         }
     }
 }
@@ -31,8 +31,8 @@ pub struct ada_owned_string {
 impl AsRef<str> for ada_owned_string {
     fn as_ref(&self) -> &str {
         unsafe {
-            let slice = std::slice::from_raw_parts(self.data.cast(), self.length);
-            std::str::from_utf8_unchecked(slice)
+            let slice = core::slice::from_raw_parts(self.data.cast(), self.length);
+            core::str::from_utf8_unchecked(slice)
         }
     }
 }
