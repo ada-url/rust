@@ -96,6 +96,11 @@ extern "C" {
     pub fn ada_set_search(url: *mut ada_url, input: *const c_char, length: usize);
     pub fn ada_set_protocol(url: *mut ada_url, input: *const c_char, length: usize) -> bool;
 
+    // Clear methods
+    pub fn ada_clear_search(url: *mut ada_url);
+    pub fn ada_clear_hash(url: *mut ada_url);
+    pub fn ada_clear_port(url: *mut ada_url);
+
     // Validators
     pub fn ada_has_credentials(url: *mut ada_url) -> bool;
     pub fn ada_has_empty_hostname(url: *mut ada_url) -> bool;
