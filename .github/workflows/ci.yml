@@ -63,7 +63,7 @@ jobs:
           echo 'FEATURES: std'
           cargo test --no-default-features --features=std
 
-      - name: Cargo Doc
+      - name: Check Documentation
         env:
           RUSTDOCFLAGS: '-D warnings'
         run: |
