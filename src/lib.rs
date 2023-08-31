@@ -808,9 +808,6 @@ impl core::str::FromStr for Url {
 mod test {
     use super::*;
 
-    #[cfg(feature = "alloc")]
-    use std::string::ToString;
-
     #[test]
     fn should_display_serialization() {
         let tests = [
