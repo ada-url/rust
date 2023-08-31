@@ -20,7 +20,7 @@
 //!     CURL  ▏ 1471 ns/URL █████████████████████████
 //! ```
 //!
-//! # Feature: `serde`
+//! ## serde
 //!
 //! If you enable the `serde` feature, [`Url`](struct.Url.html) will implement
 //! [`serde::Serialize`](https://docs.rs/serde/1/serde/trait.Serialize.html) and
@@ -30,30 +30,29 @@
 //! ```toml
 //! ada-url = { version = "1", features = ["serde"] }
 //! ```
-#![no_std]
+//!
+//! ## no-std
+//!
+//! Whilst `ada-url` has `std` feature enabled by default, you can set `no-default-features`
+//! get a subset of features that work in no-std environment.
+//!
+//! ```toml
+//! ada-url = { version = "1", no-default-features = true }
+//! ```
+
+#![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod ffi;
 mod idna;
 pub use idna::Idna;
 
-#[cfg(feature = "alloc")]
-use alloc::{borrow::ToOwned, boxed::Box, string::String};
-
 use core::{borrow, ffi::c_uint, fmt, hash, ops};
-use derive_more::{Display, Error};
-
-#[cfg(feature = "serde")]
-extern crate serde;
-
-#[cfg(feature = "alloc")]
-extern crate alloc;
-
-#[cfg(feature = "std")]
-extern crate std;
+use derive_more::Display;
 
 /// Error type of [`Url::parse`].
-#[derive(Debug, Display, Error, PartialEq, Eq)]
-#[display(bound = "Input: std::fmt::Debug")]
+#[derive(Debug, Display, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(derive_more::Error))] // derive(Error) still uses `std` even on no-std environment
+#[display(bound = "Input: core::fmt::Debug")]
 #[display(fmt = "Invalid url: {input:?}")]
 pub struct ParseUrlError<Input> {
     /// The invalid input that caused the error.
@@ -794,7 +793,7 @@ impl fmt::Display for Url {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl core::str::FromStr for Url {
     type Err = ParseUrlError<Box<str>>;
 
@@ -810,7 +809,7 @@ mod test {
     use super::*;
 
     #[cfg(feature = "alloc")]
-    use crate::alloc::string::ToString;
+    use std::string::ToString;
 
     #[test]
     fn should_display_serialization() {

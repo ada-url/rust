@@ -23,13 +23,12 @@ path = "bench/parse.rs"
 harness = false
 
 [features]
-default = ["alloc", "std"]
+default = ["std"]
 # pass `cpp_set_stdlib("c++")` to `cc`
 libcpp = []
 # enables serde serialization/deserialization support
 serde = ["dep:serde", "std"]
 # enable allocations
-alloc = []
 std = []
 
 [dependencies]
