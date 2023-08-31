@@ -20,3 +20,13 @@ msg 'TEST: std'
 cmd cargo test --no-default-features --features=std
 cmd cargo clippy --no-default-features --features=std
 cmd env RUSTDOCFLAGS='-D warnings' cargo doc --no-default-features --features=std
+
+msg 'TEST: serde'
+cmd cargo test --no-default-features --features=serde
+cmd cargo clippy --no-default-features --features=serde
+cmd env RUSTDOCFLAGS='-D warnings' cargo doc --no-default-features --features=serde
+
+msg 'TEST: std, serde'
+cmd cargo test --no-default-features --features=std,serde
+cmd cargo clippy --no-default-features --features=std,serde
+cmd env RUSTDOCFLAGS='-D warnings' cargo doc --no-default-features --features=std,serde

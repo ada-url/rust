@@ -55,6 +55,10 @@ jobs:
           cargo clippy --no-default-features
           echo 'FEATURES: std'
           cargo clippy --no-default-features --features=std
+          echo 'FEATURES: serde'
+          cargo clippy --no-default-features --features=serde
+          echo 'FEATURES: std, serde'
+          cargo clippy --no-default-features --features=std,serde
 
       - name: Test
         run: |
@@ -62,6 +66,10 @@ jobs:
           cargo test --no-default-features
           echo 'FEATURES: std'
           cargo test --no-default-features --features=std
+          echo 'FEATURES: serde'
+          cargo test --no-default-features --features=serde
+          echo 'FEATURES: std, serde'
+          cargo test --no-default-features --features=std,serde
 
       - name: Check Documentation
         env:
@@ -71,6 +79,10 @@ jobs:
           cargo doc --no-default-features
           echo 'FEATURES: std'
           cargo doc --no-default-features --features=std
+          echo 'FEATURES: serde'
+          cargo doc --no-default-features --features=serde
+          echo 'FEATURES: std, serde'
+          cargo doc --no-default-features --features=std,serde
 
   format:
     name: Format
