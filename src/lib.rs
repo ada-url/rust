@@ -732,7 +732,7 @@ impl AsRef<[u8]> for Url {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl From<Url> for String {
     fn from(val: Url) -> Self {
         val.href().to_owned()
@@ -756,7 +756,7 @@ impl<'input> TryFrom<&'input str> for Url {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl TryFrom<String> for Url {
     type Error = ParseUrlError<String>;
 
@@ -765,7 +765,7 @@ impl TryFrom<String> for Url {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl<'input> TryFrom<&'input String> for Url {
     type Error = ParseUrlError<&'input String>;
 
@@ -856,7 +856,7 @@ mod test {
         #[cfg(feature = "std")]
         std::dbg!(&url);
         let error = url.unwrap_err();
-        #[cfg(feature = "alloc")]
+        #[cfg(feature = "std")]
         assert_eq!(error.to_string(), r#"Invalid url: "this is not a url""#);
         assert_eq!(error.input, "this is not a url");
     }
