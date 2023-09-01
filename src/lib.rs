@@ -51,7 +51,7 @@ use derive_more::Display;
 
 /// Error type of [`Url::parse`].
 #[derive(Debug, Display, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(derive_more::Error))] // https://github.com/JelteF/derive_more/issues/299
+#[cfg_attr(feature = "std", derive(derive_more::Error))] // error still requires std: https://github.com/rust-lang/rust/issues/103765
 #[display(bound = "Input: core::fmt::Debug")]
 #[display(fmt = "Invalid url: {input:?}")]
 pub struct ParseUrlError<Input> {
