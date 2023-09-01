@@ -26,6 +26,12 @@ fn main() {
 }
 ```
 
+#### Features
+
+**std:** Functionalities that require `std`. This feature is enabled by default, set `no-default-features` to `true` if you want `no-std`.
+
+**serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`. Enabling this feature and `std` would provide you both `Serialize` and `Deserialize`.
+
 ### Performance
 
 Ada is fast. The benchmark below shows **3.34 times** faster URL parsing compared to `url`
