@@ -4,13 +4,6 @@ Fast [WHATWG specification](https://url.spec.whatwg.org) compliant URL parser fo
 
 ### Usage
 
-Add the following as a dependency to your project (`Cargo.toml`):
-
-```toml
-[dependencies]
-ada-url = { version = "1", features = ["derive"] }
-```
-
 Here is an example illustrating a common usage:
 
 ```Rust
@@ -33,7 +26,7 @@ Ada is fast. The benchmark below shows **3.34 times** faster URL parsing compare
 ```
 parse/ada_url           time:   [2.0790 µs 2.0812 µs 2.0835 µs]
                         thrpt:  [369.84 MiB/s 370.25 MiB/s 370.65 MiB/s]
-                        
+
 parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
                         thrpt:  [109.77 MiB/s 110.59 MiB/s 111.25 MiB/s]
 ```
