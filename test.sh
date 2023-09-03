@@ -6,27 +6,11 @@ msg() {
   echo "$@" >&2
 }
 
-cmd() {
-  echo "Running $*" >&2
-  "$@"
-}
+msg 'STEP: Test'
+cargo hack test --feature-powerset --skip libcpp
 
-msg 'TEST: no features'
-cmd cargo test --no-default-features
-cmd cargo clippy --no-default-features
-cmd env RUSTDOCFLAGS='-D warnings' cargo doc --no-default-features
+msg 'STEP: Clippy'
+cargo hack clippy --feature-powerset --skip libcpp -- -D warnings
 
-msg 'TEST: std'
-cmd cargo test --no-default-features --features=std
-cmd cargo clippy --no-default-features --features=std -- -D warnings
-cmd env RUSTDOCFLAGS='-D warnings' cargo doc --no-default-features --features=std
-
-msg 'TEST: serde'
-cmd cargo test --no-default-features --features=serde
-cmd cargo clippy --no-default-features --features=serde -- -D warnings
-cmd env RUSTDOCFLAGS='-D warnings' cargo doc --no-default-features --features=serde
-
-msg 'TEST: std, serde'
-cmd cargo test --no-default-features --features=std,serde
-cmd cargo clippy --no-default-features --features=std,serde -- -D warnings
-cmd env RUSTDOCFLAGS='-D warnings' cargo doc --no-default-features --features=std,serde
+msg 'STEP: Doc'
+RUSTDOCFLAGS='-D warnings' cargo hack doc --feature-powerset --skip libcpp

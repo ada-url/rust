@@ -49,40 +49,19 @@ jobs:
 
       - run: rustup show
 
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
       - name: Clippy
-        run: |
-          echo 'FEATURES: none'
-          cargo clippy --no-default-features -- -D warnings
-          echo 'FEATURES: std'
-          cargo clippy --no-default-features --features=std -- -D warnings
-          echo 'FEATURES: serde'
-          cargo clippy --no-default-features --features=serde -- -D warnings
-          echo 'FEATURES: std, serde'
-          cargo clippy --no-default-features --features=std,serde -- -D warnings
+        run: cargo hack clippy --feature-powerset --skip libcpp -- -D warnings
 
       - name: Test
-        run: |
-          echo 'FEATURES: none'
-          cargo test --no-default-features
-          echo 'FEATURES: std'
-          cargo test --no-default-features --features=std
-          echo 'FEATURES: serde'
-          cargo test --no-default-features --features=serde
-          echo 'FEATURES: std, serde'
-          cargo test --no-default-features --features=std,serde
+        run: cargo hack test --feature-powerset --skip libcpp
 
       - name: Check Documentation
         env:
           RUSTDOCFLAGS: '-D warnings'
-        run: |
-          echo 'FEATURES: none'
-          cargo doc --no-default-features
-          echo 'FEATURES: std'
-          cargo doc --no-default-features --features=std
-          echo 'FEATURES: serde'
-          cargo doc --no-default-features --features=serde
-          echo 'FEATURES: std, serde'
-          cargo doc --no-default-features --features=std,serde
+        run: cargo hack doc --feature-powerset --skip libcpp
 
   format:
     name: Format
