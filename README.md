@@ -25,6 +25,8 @@ fn main() {
 
 **serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`. Enabling this feature and `std` would provide you both `Serialize` and `Deserialize`.
 
+**libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default. Enabling this feature without `libc++` installed would cause compile error.
+
 ### Performance
 
 Ada is fast. The benchmark below shows **3.34 times** faster URL parsing compared to `url`
