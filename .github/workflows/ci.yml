@@ -53,15 +53,15 @@ jobs:
         uses: taiki-e/install-action@cargo-hack
 
       - name: Clippy
-        run: cargo hack clippy --feature-powerset --skip libcpp -- -D warnings
+        run: cargo hack clippy --feature-powerset -- -D warnings
 
       - name: Test
-        run: cargo hack test --feature-powerset --skip libcpp
+        run: cargo hack test --feature-powerset
 
       - name: Check Documentation
         env:
           RUSTDOCFLAGS: '-D warnings'
-        run: cargo hack doc --feature-powerset --skip libcpp
+        run: cargo hack doc --feature-powerset
 
   format:
     name: Format

@@ -7,10 +7,10 @@ msg() {
 }
 
 msg 'STEP: Test'
-cargo hack test --feature-powerset --skip libcpp
+cargo hack test --feature-powerset
 
 msg 'STEP: Clippy'
-cargo hack clippy --feature-powerset --skip libcpp -- -D warnings
+cargo hack clippy --feature-powerset -- -D warnings
 
 msg 'STEP: Doc'
-RUSTDOCFLAGS='-D warnings' cargo hack doc --feature-powerset --skip libcpp
+RUSTDOCFLAGS='-D warnings' cargo hack doc --feature-powerset
