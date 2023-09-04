@@ -6,16 +6,13 @@ msg() {
   echo "$@" >&2
 }
 
-extra_args=()
-if [[ -n "${SKIP_FEATURES:-}" ]]; then
-  extra_args+=(--skip "$SKIP_FEATURES")
-fi
+skip_features=${SKIP_FEATURES:-}
 
 msg 'STEP: Test'
-cargo hack test --feature-powerset "${extra_args[@]}"
+cargo hack test --feature-powerset --skip="$skip_features"
 
 msg 'STEP: Clippy'
-cargo hack clippy --feature-powerset "${extra_args[@]}" -- -D warnings
+cargo hack clippy --feature-powerset --skip="$skip_features" -- -D warnings
 
 msg 'STEP: Doc'
-RUSTDOCFLAGS='-D warnings' cargo hack doc "${extra_args[@]}" --feature-powerset
+RUSTDOCFLAGS='-D warnings' cargo hack doc --skip="$skip_features" --feature-powerset
