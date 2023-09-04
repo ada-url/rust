@@ -20,7 +20,7 @@ pub fn parse_benchmark(c: &mut Criterion) {
     group.bench_function("ada_url", |b| {
         b.iter(|| {
             URLS.iter().for_each(|url| {
-                black_box(url).parse::<ada_url::Url>().unwrap();
+                ada_url::Url::try_from(*black_box(url)).unwrap();
             })
         })
     });

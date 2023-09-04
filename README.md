@@ -9,7 +9,7 @@ Here is an example illustrating a common usage:
 ```Rust
 use ada_url::Url;
 fn main() {
-    let mut u = Url::parse("http://www.google:8080/love#drug", None).expect("bad url");
+    let u = Url::parse("http://www.google:8080/love#drug", None).expect("bad url");
     println!("port: {:?}", u.port());
     println!("hash: {:?}", u.hash());
     println!("pathname: {:?}", u.pathname());
@@ -18,6 +18,14 @@ fn main() {
     println!("href: {:?}", u.href());
 }
 ```
+
+#### Features
+
+**std:** Functionalities that require `std`. This feature is enabled by default, set `no-default-features` to `true` if you want `no-std`.
+
+**serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`. Enabling this feature and `std` would provide you both `Serialize` and `Deserialize`.
+
+**libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default. Enabling this feature without `libc++` installed would cause compile error.
 
 ### Performance
 
@@ -48,3 +56,21 @@ parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
 | **[`Deref<Target=str>`](https://doc.rust-lang.org/std/ops/trait.Deref.html)**                                                                         | Allows for `&Url` to dereference as a `&str`. Also provides a [number of string methods](https://doc.rust-lang.org/std/string/struct.String.html#deref-methods-str)                                           |
 | **[`AsRef<[u8]>`](https://doc.rust-lang.org/std/convert/trait.AsRef.html), [`AsRef<str>`](https://doc.rust-lang.org/std/convert/trait.AsRef.html)**   | Used to do a cheap reference-to-reference conversion.                                                                                                                                                         |
 | **[`Send`](https://doc.rust-lang.org/std/marker/trait.Send.html)**                                                                                    | Used to declare that the type can be transferred across thread boundaries.                                                                                                                                    |
+
+### Development
+
+#### `test.sh`
+
+`test.sh` is a convenient helper script that would allow developer to quickly and comprehensively check, lint, and test their code and documentation.
+
+**Basic Usage:**
+
+```sh
+./test.sh
+```
+
+**Skipping features:**
+
+```sh
+SKIP_FEATURES=serde,libcpp ./test.sh
+```

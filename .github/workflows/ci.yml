@@ -49,16 +49,19 @@ jobs:
 
       - run: rustup show
 
-      - name: Cargo Check
-        run: cargo check --all-targets --all-features --locked
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
 
-      - name: Cargo Test
-        run: cargo test --all-targets --all-features
+      - name: Clippy
+        run: cargo hack clippy --feature-powerset -- -D warnings
 
-      - name: Cargo Doc
+      - name: Test
+        run: cargo hack test --feature-powerset
+
+      - name: Check Documentation
         env:
           RUSTDOCFLAGS: '-D warnings'
-        run: cargo doc
+        run: cargo hack doc --feature-powerset
 
   format:
     name: Format

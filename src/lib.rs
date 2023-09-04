@@ -20,7 +20,7 @@
 //!     CURL  ▏ 1471 ns/URL █████████████████████████
 //! ```
 //!
-//! # Feature: `serde`
+//! ## serde
 //!
 //! If you enable the `serde` feature, [`Url`](struct.Url.html) will implement
 //! [`serde::Serialize`](https://docs.rs/serde/1/serde/trait.Serialize.html) and
@@ -30,20 +30,29 @@
 //! ```toml
 //! ada-url = { version = "1", features = ["serde"] }
 //! ```
+//!
+//! ## no-std
+//!
+//! Whilst `ada-url` has `std` feature enabled by default, you can set `no-default-features`
+//! get a subset of features that work in no-std environment.
+//!
+//! ```toml
+//! ada-url = { version = "1", no-default-features = true }
+//! ```
+
+#![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod ffi;
 mod idna;
 pub use idna::Idna;
 
 use core::{borrow, ffi::c_uint, fmt, hash, ops};
-use derive_more::{Display, Error};
-
-#[cfg(feature = "serde")]
-extern crate serde;
+use derive_more::Display;
 
 /// Error type of [`Url::parse`].
-#[derive(Debug, Display, Error, PartialEq, Eq)]
-#[display(bound = "Input: std::fmt::Debug")]
+#[derive(Debug, Display, PartialEq, Eq)]
+#[cfg_attr(feature = "std", derive(derive_more::Error))] // error still requires std: https://github.com/rust-lang/rust/issues/103765
+#[display(bound = "Input: core::fmt::Debug")]
 #[display(fmt = "Invalid url: {input:?}")]
 pub struct ParseUrlError<Input> {
     /// The invalid input that caused the error.
@@ -642,6 +651,7 @@ impl serde::Serialize for Url {
 ///
 /// This implementation is only available if the `serde` Cargo feature is enabled.
 #[cfg(feature = "serde")]
+#[cfg(feature = "std")]
 impl<'de> serde::Deserialize<'de> for Url {
     fn deserialize<D>(deserializer: D) -> Result<Url, D::Error>
     where
@@ -663,7 +673,7 @@ impl<'de> serde::Deserialize<'de> for Url {
                 E: Error,
             {
                 Url::parse(s, None).map_err(|err| {
-                    let err_s = format!("{}", err);
+                    let err_s = std::format!("{}", err);
                     Error::invalid_value(Unexpected::Str(s), &err_s.as_str())
                 })
             }
@@ -687,13 +697,13 @@ impl PartialEq for Url {
 }
 
 impl PartialOrd for Url {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.href().partial_cmp(other.href())
     }
 }
 
 impl Ord for Url {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.href().cmp(other.href())
     }
 }
@@ -722,6 +732,7 @@ impl AsRef<[u8]> for Url {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<Url> for String {
     fn from(val: Url) -> Self {
         val.href().to_owned()
@@ -745,6 +756,7 @@ impl<'input> TryFrom<&'input str> for Url {
     }
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<String> for Url {
     type Error = ParseUrlError<String>;
 
@@ -753,6 +765,7 @@ impl TryFrom<String> for Url {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'input> TryFrom<&'input String> for Url {
     type Error = ParseUrlError<&'input String>;
 
@@ -780,7 +793,8 @@ impl fmt::Display for Url {
     }
 }
 
-impl std::str::FromStr for Url {
+#[cfg(feature = "std")]
+impl core::str::FromStr for Url {
     type Err = ParseUrlError<Box<str>>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -818,16 +832,16 @@ mod test {
             ),
         ];
         for (value, expected) in tests {
-            eprintln!("{value} -> {expected}");
             let url = Url::parse(value, None).expect("Should have parsed url");
-            assert_eq!(url.to_string(), expected);
+            assert_eq!(url.as_str(), expected);
         }
     }
 
     #[test]
     fn try_from_ok() {
         let url = Url::try_from("http://example.com/foo/bar?k1=v1&k2=v2");
-        dbg!(&url);
+        #[cfg(feature = "std")]
+        std::dbg!(&url);
         let url = url.unwrap();
         assert_eq!(url.href(), "http://example.com/foo/bar?k1=v1&k2=v2");
         assert_eq!(
@@ -839,8 +853,10 @@ mod test {
     #[test]
     fn try_from_err() {
         let url = Url::try_from("this is not a url");
-        dbg!(&url);
+        #[cfg(feature = "std")]
+        std::dbg!(&url);
         let error = url.unwrap_err();
+        #[cfg(feature = "std")]
         assert_eq!(error.to_string(), r#"Invalid url: "this is not a url""#);
         assert_eq!(error.input, "this is not a url");
     }
@@ -938,16 +954,17 @@ mod test {
         assert!(Url::can_parse("/helo", Some("https://www.google.com")));
     }
 
+    #[cfg(feature = "std")]
     #[cfg(feature = "serde")]
     #[test]
     fn test_serde_serialize_deserialize() {
         let input = "https://www.google.com";
         let output = "\"https://www.google.com/\"";
         let url = Url::parse(&input, None).unwrap();
-        assert_eq!(serde_json::to_string(&url).unwrap(), output.to_string());
+        assert_eq!(serde_json::to_string(&url).unwrap(), output);
 
         let deserialized: Url = serde_json::from_str(&output).unwrap();
-        assert_eq!(deserialized.href(), input.to_string() + "/");
+        assert_eq!(deserialized.href(), "https://www.google.com/");
     }
 
     #[test]
