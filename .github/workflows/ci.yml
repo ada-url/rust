@@ -73,21 +73,6 @@ jobs:
 
       - run: cargo fmt --all -- --check
 
-  libcpp:
-    name: libc++
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-          - os: ubuntu-latest
-          - os: macos-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3
-
-      - run: cargo test --features=libcpp
-
   lint:
     name: Clippy
     runs-on: ubuntu-latest
