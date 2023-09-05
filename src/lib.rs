@@ -78,9 +78,9 @@ impl From<c_uint> for HostType {
     }
 }
 
-/// Defines the schema type of the url.
+/// Defines the scheme type of the url.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SchemaType {
+pub enum SchemeType {
     Http = 0,
     NotSpecial = 1,
     Https = 2,
@@ -90,17 +90,17 @@ pub enum SchemaType {
     File = 6,
 }
 
-impl From<c_uint> for SchemaType {
+impl From<c_uint> for SchemeType {
     fn from(value: c_uint) -> Self {
         match value {
-            0 => SchemaType::Http,
-            1 => SchemaType::NotSpecial,
-            2 => SchemaType::Https,
-            3 => SchemaType::Ws,
-            4 => SchemaType::Ftp,
-            5 => SchemaType::Wss,
-            6 => SchemaType::File,
-            _ => SchemaType::NotSpecial,
+            0 => SchemeType::Http,
+            1 => SchemeType::NotSpecial,
+            2 => SchemeType::Https,
+            3 => SchemeType::Ws,
+            4 => SchemeType::Ftp,
+            5 => SchemeType::Wss,
+            6 => SchemeType::File,
+            _ => SchemeType::NotSpecial,
         }
     }
 }
@@ -251,9 +251,9 @@ impl Url {
         HostType::from(unsafe { ffi::ada_get_host_type(self.0) })
     }
 
-    /// Returns the type of the schema such as http, https, etc.
-    pub fn schema_type(&self) -> SchemaType {
-        SchemaType::from(unsafe { ffi::ada_get_schema_type(self.0) })
+    /// Returns the type of the scheme such as http, https, etc.
+    pub fn scheme(&self) -> SchemeType {
+        SchemeType::from(unsafe { ffi::ada_get_schema_type(self.0) })
     }
 
     /// Return the origin of this URL
@@ -939,7 +939,7 @@ mod test {
             "https://username:password@google.com:9090/search?query#hash"
         );
 
-        assert_eq!(out.schema_type(), SchemaType::Https);
+        assert_eq!(out.scheme(), SchemeType::Https);
 
         out.set_username(Some("new-username")).unwrap();
         assert_eq!(out.username(), "new-username");
@@ -971,7 +971,7 @@ mod test {
 
         out.set_protocol("wss").unwrap();
         assert_eq!(out.protocol(), "wss:");
-        assert_eq!(out.schema_type(), SchemaType::Wss);
+        assert_eq!(out.scheme(), SchemeType::Wss);
 
         assert!(out.has_credentials());
         assert!(out.has_non_empty_username());
@@ -984,48 +984,48 @@ mod test {
     }
 
     #[test]
-    fn schema_types() {
+    fn scheme_types() {
         assert_eq!(
             Url::parse("file:///foo/bar", None)
                 .expect("bad url")
-                .schema_type(),
-            SchemaType::File
+                .scheme(),
+            SchemeType::File
         );
         assert_eq!(
             Url::parse("ws://example.com/ws", None)
                 .expect("bad url")
-                .schema_type(),
-            SchemaType::Ws
+                .scheme(),
+            SchemeType::Ws
         );
         assert_eq!(
             Url::parse("wss://example.com/wss", None)
                 .expect("bad url")
-                .schema_type(),
-            SchemaType::Wss
+                .scheme(),
+            SchemeType::Wss
         );
         assert_eq!(
             Url::parse("ftp://example.com/file.txt", None)
                 .expect("bad url")
-                .schema_type(),
-            SchemaType::Ftp
+                .scheme(),
+            SchemeType::Ftp
         );
         assert_eq!(
             Url::parse("http://example.com/file.txt", None)
                 .expect("bad url")
-                .schema_type(),
-            SchemaType::Http
+                .scheme(),
+            SchemeType::Http
         );
         assert_eq!(
             Url::parse("https://example.com/file.txt", None)
                 .expect("bad url")
-                .schema_type(),
-            SchemaType::Https
+                .scheme(),
+            SchemeType::Https
         );
         assert_eq!(
             Url::parse("foo://example.com", None)
                 .expect("bad url")
-                .schema_type(),
-            SchemaType::NotSpecial
+                .scheme(),
+            SchemeType::NotSpecial
         );
     }
 
