@@ -1,4 +1,4 @@
-/* auto-generated on 2023-09-05 14:59:23 -0400. Do not edit! */
+/* auto-generated on 2023-09-05 16:55:45 -0400. Do not edit! */
 /* begin file src/ada.cpp */
 #include "ada.h"
 /* begin file src/checkers.cpp */
@@ -15009,7 +15009,7 @@ uint8_t ada_get_host_type(ada_url result) noexcept {
   return r->host_type;
 }
 
-uint8_t ada_get_schema_type(ada_url result) noexcept {
+uint8_t ada_get_scheme_type(ada_url result) noexcept {
   ada::result<ada::url_aggregator>& r = get_instance(result);
   if (!r) {
     return 0;
