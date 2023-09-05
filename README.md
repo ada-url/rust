@@ -1,6 +1,10 @@
-## Rust bindings for Ada
+## WHATWG URL parser for Rust
 
-Fast [WHATWG specification](https://url.spec.whatwg.org) compliant URL parser for Rust.
+Fast [WHATWG URL Specification](https://url.spec.whatwg.org) compliant URL parser for Rust. 
+Well-tested and widely used by Node.js since [Node 18](https://nodejs.org/en/blog/release/v18.17.0).
+
+The Ada library passes the full range of tests from the specification, across a wide range of platforms (e.g., Windows, Linux, macOS).
+It fully supports the relevant [Unicode Technical Standard](https://www.unicode.org/reports/tr46/#ToUnicode).
 
 ### Usage
 
@@ -21,11 +25,14 @@ fn main() {
 
 #### Features
 
-**std:** Functionalities that require `std`. This feature is enabled by default, set `no-default-features` to `true` if you want `no-std`.
+**std:** Functionalities that require `std`. 
+This feature is enabled by default, set `no-default-features` to `true` if you want `no-std`.
 
-**serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`. Enabling this feature and `std` would provide you both `Serialize` and `Deserialize`.
+**serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`. 
+Enabling this feature and `std` would provide you both `Serialize` and `Deserialize`.
 
-**libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default. Enabling this feature without `libc++` installed would cause compile error.
+**libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default. 
+Enabling this feature without `libc++` installed would cause compile error.
 
 ### Performance
 
@@ -56,6 +63,7 @@ parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
 | **[`Deref<Target=str>`](https://doc.rust-lang.org/std/ops/trait.Deref.html)**                                                                         | Allows for `&Url` to dereference as a `&str`. Also provides a [number of string methods](https://doc.rust-lang.org/std/string/struct.String.html#deref-methods-str)                                           |
 | **[`AsRef<[u8]>`](https://doc.rust-lang.org/std/convert/trait.AsRef.html), [`AsRef<str>`](https://doc.rust-lang.org/std/convert/trait.AsRef.html)**   | Used to do a cheap reference-to-reference conversion.                                                                                                                                                         |
 | **[`Send`](https://doc.rust-lang.org/std/marker/trait.Send.html)**                                                                                    | Used to declare that the type can be transferred across thread boundaries.                                                                                                                                    |
+| **[`Sync`](https://doc.rust-lang.org/stable/std/marker/trait.Sync.html)**                                                                             | Used to declare that the type is thread-safe.                                                                                                                                                                 |
 
 ### Development
 
@@ -74,3 +82,9 @@ parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
 ```sh
 SKIP_FEATURES=serde,libcpp ./test.sh
 ```
+
+### License
+
+This code is made available under the Apache License 2.0 as well as the MIT license. 
+
+Our tests include third-party code and data. The benchmarking code includes third-party code: it is provided for research purposes only and not part of the library.
