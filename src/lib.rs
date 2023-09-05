@@ -252,8 +252,8 @@ impl Url {
     }
 
     /// Returns the type of the scheme such as http, https, etc.
-    pub fn scheme(&self) -> SchemeType {
-        SchemeType::from(unsafe { ffi::ada_get_schema_type(self.0) })
+    pub fn scheme_type(&self) -> SchemeType {
+        SchemeType::from(unsafe { ffi::ada_get_scheme_type(self.0) })
     }
 
     /// Return the origin of this URL
@@ -939,7 +939,7 @@ mod test {
             "https://username:password@google.com:9090/search?query#hash"
         );
 
-        assert_eq!(out.scheme(), SchemeType::Https);
+        assert_eq!(out.scheme_type(), SchemeType::Https);
 
         out.set_username(Some("new-username")).unwrap();
         assert_eq!(out.username(), "new-username");
@@ -971,7 +971,7 @@ mod test {
 
         out.set_protocol("wss").unwrap();
         assert_eq!(out.protocol(), "wss:");
-        assert_eq!(out.scheme(), SchemeType::Wss);
+        assert_eq!(out.scheme_type(), SchemeType::Wss);
 
         assert!(out.has_credentials());
         assert!(out.has_non_empty_username());
@@ -988,43 +988,43 @@ mod test {
         assert_eq!(
             Url::parse("file:///foo/bar", None)
                 .expect("bad url")
-                .scheme(),
+                .scheme_type(),
             SchemeType::File
         );
         assert_eq!(
             Url::parse("ws://example.com/ws", None)
                 .expect("bad url")
-                .scheme(),
+                .scheme_type(),
             SchemeType::Ws
         );
         assert_eq!(
             Url::parse("wss://example.com/wss", None)
                 .expect("bad url")
-                .scheme(),
+                .scheme_type(),
             SchemeType::Wss
         );
         assert_eq!(
             Url::parse("ftp://example.com/file.txt", None)
                 .expect("bad url")
-                .scheme(),
+                .scheme_type(),
             SchemeType::Ftp
         );
         assert_eq!(
             Url::parse("http://example.com/file.txt", None)
                 .expect("bad url")
-                .scheme(),
+                .scheme_type(),
             SchemeType::Http
         );
         assert_eq!(
             Url::parse("https://example.com/file.txt", None)
                 .expect("bad url")
-                .scheme(),
+                .scheme_type(),
             SchemeType::Https
         );
         assert_eq!(
             Url::parse("foo://example.com", None)
                 .expect("bad url")
-                .scheme(),
+                .scheme_type(),
             SchemeType::NotSpecial
         );
     }
