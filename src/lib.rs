@@ -251,7 +251,7 @@ impl Url {
         HostType::from(unsafe { ffi::ada_get_host_type(self.0) })
     }
 
-    /// Returns the type of the schema such as http,
+    /// Returns the type of the schema such as http, https, etc.
     pub fn schema_type(&self) -> SchemaType {
         SchemaType::from(unsafe { ffi::ada_get_schema_type(self.0) })
     }
