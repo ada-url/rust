@@ -78,6 +78,33 @@ impl From<c_uint> for HostType {
     }
 }
 
+/// Defines the schema type of the url.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SchemaType {
+    Http = 0,
+    NotSpecial = 1,
+    Https = 2,
+    Ws = 3,
+    Ftp = 4,
+    Wss = 5,
+    File = 6,
+}
+
+impl From<c_uint> for SchemaType {
+    fn from(value: c_uint) -> Self {
+        match value {
+            0 => SchemaType::Http,
+            1 => SchemaType::NotSpecial,
+            2 => SchemaType::Https,
+            3 => SchemaType::Ws,
+            4 => SchemaType::Ftp,
+            5 => SchemaType::Wss,
+            6 => SchemaType::File,
+            _ => SchemaType::NotSpecial,
+        }
+    }
+}
+
 /// Components are a serialization-free representation of a URL.
 /// For usages where string serialization has a high cost, you can
 /// use url components with `href` attribute.
@@ -222,6 +249,11 @@ impl Url {
     /// Returns the type of the host such as default, ipv4 or ipv6.
     pub fn host_type(&self) -> HostType {
         HostType::from(unsafe { ffi::ada_get_host_type(self.0) })
+    }
+
+    /// Returns the type of the schema such as http,
+    pub fn schema_type(&self) -> SchemaType {
+        SchemaType::from(unsafe { ffi::ada_get_schema_type(self.0) })
     }
 
     /// Return the origin of this URL
@@ -907,6 +939,8 @@ mod test {
             "https://username:password@google.com:9090/search?query#hash"
         );
 
+        assert_eq!(out.schema_type(), SchemaType::Https);
+
         out.set_username(Some("new-username")).unwrap();
         assert_eq!(out.username(), "new-username");
 
@@ -937,6 +971,7 @@ mod test {
 
         out.set_protocol("wss").unwrap();
         assert_eq!(out.protocol(), "wss:");
+        assert_eq!(out.schema_type(), SchemaType::Wss);
 
         assert!(out.has_credentials());
         assert!(out.has_non_empty_username());
@@ -946,6 +981,52 @@ mod test {
         assert!(out.has_password());
 
         assert_eq!(out.host_type(), HostType::Domain);
+    }
+
+    #[test]
+    fn schema_types() {
+        assert_eq!(
+            Url::parse("file:///foo/bar", None)
+                .expect("bad url")
+                .schema_type(),
+            SchemaType::File
+        );
+        assert_eq!(
+            Url::parse("ws://example.com/ws", None)
+                .expect("bad url")
+                .schema_type(),
+            SchemaType::Ws
+        );
+        assert_eq!(
+            Url::parse("wss://example.com/wss", None)
+                .expect("bad url")
+                .schema_type(),
+            SchemaType::Wss
+        );
+        assert_eq!(
+            Url::parse("ftp://example.com/file.txt", None)
+                .expect("bad url")
+                .schema_type(),
+            SchemaType::Ftp
+        );
+        assert_eq!(
+            Url::parse("http://example.com/file.txt", None)
+                .expect("bad url")
+                .schema_type(),
+            SchemaType::Http
+        );
+        assert_eq!(
+            Url::parse("https://example.com/file.txt", None)
+                .expect("bad url")
+                .schema_type(),
+            SchemaType::Https
+        );
+        assert_eq!(
+            Url::parse("foo://example.com", None)
+                .expect("bad url")
+                .schema_type(),
+            SchemaType::NotSpecial
+        );
     }
 
     #[test]
