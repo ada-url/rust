@@ -17,6 +17,7 @@ fn main() {
     let compile_target_arch = env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH");
     let compile_target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS");
     let compile_target_env = env::var("CARGO_CFG_TARGET_ENV").expect("CARGO_CFG_TARGET_ENV");
+    let compile_target_feature = env::var("CARGO_CFG_TARGET_FEATURE");
     // Except for Emscripten target (which emulates POSIX environment), compile to Wasm via WASI SDK
     // which is currently the only standalone provider of stdlib for compilation of C/C++ libraries.
     if compile_target_arch.starts_with("wasm") && compile_target_os != "emscripten" {
@@ -26,7 +27,13 @@ fn main() {
             "WASI SDK not found at {wasi_sdk}"
         );
         build.compiler(format!("{wasi_sdk}/bin/clang++"));
-        println!("cargo:rustc-link-search={wasi_sdk}/share/wasi-sysroot/lib/wasm32-wasi");
+        let wasi_sysroot_lib = match compile_target_feature {
+            Ok(compile_target_feature) if compile_target_feature.contains("atomics") => {
+                "wasm32-wasi-threads"
+            }
+            _ => "wasm32-wasi",
+        };
+        println!("cargo:rustc-link-search={wasi_sdk}/share/wasi-sysroot/lib/{wasi_sysroot_lib}");
         // Wasm exceptions are new and not yet supported by WASI SDK.
         build.flag("-fno-exceptions");
         // WASI SDK only has libc++ available.

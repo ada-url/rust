@@ -43,6 +43,10 @@ int32_t __imported_wasi_snapshot_preview1_fd_write(int32_t,
   __builtin_unreachable();
 }
 
+int32_t __imported_wasi_snapshot_preview1_sched_yield() {
+  return 0;
+}
+
 _Noreturn void __imported_wasi_snapshot_preview1_proc_exit(int32_t) {
   __builtin_unreachable();
 }
