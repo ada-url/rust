@@ -1,6 +1,6 @@
 ## WHATWG URL parser for Rust
 
-Fast [WHATWG URL Specification](https://url.spec.whatwg.org) compliant URL parser for Rust. 
+Fast [WHATWG URL Specification](https://url.spec.whatwg.org) compliant URL parser for Rust.
 Well-tested and widely used by Node.js since [Node 18](https://nodejs.org/en/blog/release/v18.17.0).
 
 The Ada library passes the full range of tests from the specification, across a wide range of platforms (e.g., Windows, Linux, macOS).
@@ -25,13 +25,13 @@ fn main() {
 
 #### Features
 
-**std:** Functionalities that require `std`. 
+**std:** Functionalities that require `std`.
 This feature is enabled by default, set `no-default-features` to `true` if you want `no-std`.
 
-**serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`. 
+**serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`.
 Enabling this feature and `std` would provide you both `Serialize` and `Deserialize`.
 
-**libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default. 
+**libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default.
 Enabling this feature without `libc++` installed would cause compile error.
 
 ### Performance
@@ -67,24 +67,24 @@ parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
 
 ### Development
 
-#### `test.sh`
+#### `justfile`
 
-`test.sh` is a convenient helper script that would allow developer to quickly and comprehensively check, lint, and test their code and documentation.
+The [`justfile`](./justfile) contains commands (called "recipes") that can be executed by [just](https://github.com/casey/just) for convenience.
 
-**Basic Usage:**
+**Run all lints and tests:**
 
 ```sh
-./test.sh
+just all
 ```
 
 **Skipping features:**
 
 ```sh
-SKIP_FEATURES=serde,libcpp ./test.sh
+just all --skip=libcpp,serde
 ```
 
 ### License
 
-This code is made available under the Apache License 2.0 as well as the MIT license. 
+This code is made available under the Apache License 2.0 as well as the MIT license.
 
 Our tests include third-party code and data. The benchmarking code includes third-party code: it is provided for research purposes only and not part of the library.
