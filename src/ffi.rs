@@ -14,6 +14,12 @@ pub struct ada_url {
 }
 
 #[repr(C)]
+pub struct ada_url_search_params {
+    _unused: [u8; 0],
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+#[repr(C)]
 pub struct ada_string {
     pub data: *const c_char,
     pub length: usize,
@@ -62,6 +68,37 @@ impl Drop for ada_owned_string {
             ada_free_owned_string(copy);
         };
     }
+
+/// Represents an std::vector<std::string>
+#[repr(C)]
+pub struct ada_strings {
+    _unused: [u8; 0],
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+#[repr(C)]
+pub struct ada_url_search_params_keys_iter {
+    _unused: [u8; 0],
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+#[repr(C)]
+pub struct ada_url_search_params_values_iter {
+    _unused: [u8; 0],
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+#[repr(C)]
+pub struct ada_url_search_params_entries_iter {
+    _unused: [u8; 0],
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+/// Represents a key/value pair of strings
+#[repr(C)]
+pub struct ada_string_pair {
+    pub key: ada_string,
+    pub value: ada_string,
 }
 
 #[repr(C)]
@@ -143,6 +180,102 @@ extern "C" {
     // IDNA methods
     pub fn ada_idna_to_unicode(input: *const c_char, length: usize) -> ada_owned_string;
     pub fn ada_idna_to_ascii(input: *const c_char, length: usize) -> ada_owned_string;
+
+    // URLSearchParams
+    pub fn ada_parse_search_params(
+        input: *const c_char,
+        length: usize,
+    ) -> *mut ada_url_search_params;
+    pub fn ada_free_search_params(search_params: *mut ada_url_search_params);
+    pub fn ada_search_params_size(search_params: *mut ada_url_search_params) -> usize;
+    pub fn ada_search_params_sort(search_params: *mut ada_url_search_params);
+    pub fn ada_search_params_to_string(
+        search_params: *mut ada_url_search_params,
+    ) -> ada_owned_string;
+    pub fn ada_search_params_append(
+        search_params: *mut ada_url_search_params,
+        name: *const c_char,
+        name_length: usize,
+        value: *const c_char,
+        value_length: usize,
+    );
+    pub fn ada_search_params_set(
+        search_params: *mut ada_url_search_params,
+        name: *const c_char,
+        name_length: usize,
+        value: *const c_char,
+        value_length: usize,
+    );
+    pub fn ada_search_params_remove(
+        search_params: *mut ada_url_search_params,
+        name: *const c_char,
+        name_length: usize,
+    );
+    pub fn ada_search_params_remove_value(
+        search_params: *mut ada_url_search_params,
+        name: *const c_char,
+        name_length: usize,
+        value: *const c_char,
+        value_length: usize,
+    );
+    pub fn ada_search_params_has(
+        search_params: *mut ada_url_search_params,
+        name: *const c_char,
+        name_length: usize,
+    ) -> bool;
+    pub fn ada_search_params_has_value(
+        search_params: *mut ada_url_search_params,
+        name: *const c_char,
+        name_length: usize,
+        value: *const c_char,
+        value_length: usize,
+    ) -> bool;
+    pub fn ada_search_params_get(
+        search_params: *mut ada_url_search_params,
+        key: *const c_char,
+        key_length: usize,
+    ) -> ada_string;
+    pub fn ada_search_params_get_all(
+        // not implemented
+        search_params: *mut ada_url_search_params,
+        key: *const c_char,
+        key_length: usize,
+    ) -> *mut ada_strings;
+    pub fn ada_search_params_get_keys(
+        search_params: *mut ada_url_search_params,
+    ) -> *mut ada_url_search_params_keys_iter;
+    pub fn ada_search_params_get_values(
+        search_params: *mut ada_url_search_params,
+    ) -> *mut ada_url_search_params_values_iter;
+    pub fn ada_search_params_get_entries(
+        search_params: *mut ada_url_search_params,
+    ) -> *mut ada_url_search_params_entries_iter;
+
+    pub fn ada_free_strings(strings: *mut ada_strings);
+    pub fn ada_strings_size(strings: *mut ada_strings) -> usize;
+    pub fn ada_strings_get(strings: *mut ada_strings, index: usize) -> ada_string;
+    pub fn ada_free_search_params_keys_iter(iter: *mut ada_url_search_params_keys_iter);
+    pub fn ada_search_params_keys_iter_next(
+        iter: *mut ada_url_search_params_keys_iter,
+    ) -> *mut ada_string;
+    pub fn ada_search_params_keys_iter_has_next(iter: *mut ada_url_search_params_keys_iter)
+        -> bool;
+
+    pub fn ada_free_search_params_values_iter(iter: *mut ada_url_search_params_values_iter);
+    pub fn ada_search_params_values_iter_next(
+        iter: *mut ada_url_search_params_values_iter,
+    ) -> *mut ada_string;
+    pub fn ada_search_params_values_iter_has_next(
+        iter: *mut ada_url_search_params_values_iter,
+    ) -> bool;
+
+    pub fn ada_free_search_params_entries_iter(iter: *mut ada_url_search_params_entries_iter);
+    pub fn ada_search_params_entries_iter_next(
+        iter: *mut ada_url_search_params_entries_iter,
+    ) -> *mut ada_string_pair;
+    pub fn ada_search_params_entries_iter_has_next(
+        iter: *mut ada_url_search_params_entries_iter,
+    ) -> bool;
 }
 
 #[cfg(test)]
