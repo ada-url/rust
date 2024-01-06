@@ -729,9 +729,7 @@ impl PartialEq for Url {
 }
 
 impl PartialOrd for Url {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        self.href().partial_cmp(other.href())
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> { Some(self.cmp(other)) }
 }
 
 impl Ord for Url {
