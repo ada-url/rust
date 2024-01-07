@@ -41,7 +41,7 @@ impl Display for Target {
 }
 
 pub fn ndk() -> String {
-    std::env::var("ANDROID_NDK").expect("ANDROID_NDK variable not set")
+    env::var("ANDROID_NDK").expect("ANDROID_NDK variable not set")
 }
 
 pub fn target_arch(arch: &str) -> &str {
@@ -89,9 +89,7 @@ fn ndk_major_version(ndk_dir: &Path) -> u32 {
 fn main() {
     let target_str = env::var("TARGET").unwrap();
     let target: Vec<String> = target_str.split('-').map(|s| s.into()).collect();
-    if target.len() < 3 {
-        assert!(!(target.len() < 3), "Failed to parse TARGET {}", target_str);
-    }
+    assert!(target.len() >= 3, "Failed to parse TARGET {}", target_str);
 
     let abi = if target.len() > 3 {
         Some(target[3].clone())
@@ -143,7 +141,7 @@ fn main() {
             if compile_target_arch.starts_with("wasm") && compile_target_os != "emscripten" {
                 let wasi_sdk = env::var("WASI_SDK").unwrap_or_else(|_| "/opt/wasi-sdk".to_owned());
                 assert!(
-                    std::path::Path::new(&wasi_sdk).exists(),
+                    Path::new(&wasi_sdk).exists(),
                     "WASI SDK not found at {wasi_sdk}"
                 );
                 build.compiler(format!("{wasi_sdk}/bin/clang++"));
@@ -185,7 +183,7 @@ fn main() {
                             "libcmt.lib",
                         );
                     }
-                };
+                }
             } else if compiler.is_like_clang() && cfg!(feature = "libcpp") {
                 build.cpp_set_stdlib("c++");
             }
