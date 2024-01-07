@@ -9,16 +9,16 @@ use std::{env, fmt};
 pub struct Target {
     pub architecture: String,
     pub vendor: String,
-    pub system: String,
+    pub system: Option<String>,
     pub abi: Option<String>,
 }
 
 impl Target {
-    pub fn as_strs(&self) -> (&str, &str, &str, Option<&str>) {
+    pub fn as_strs(&self) -> (&str, &str, Option<&str>, Option<&str>) {
         (
             self.architecture.as_str(),
             self.vendor.as_str(),
-            self.system.as_str(),
+            self.system.as_deref(),
             self.abi.as_deref(),
         )
     }
@@ -26,11 +26,13 @@ impl Target {
 
 impl Display for Target {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}-{}-{}",
-            &self.architecture, &self.vendor, &self.system
-        )?;
+        write!(f, "{}-{}", &self.architecture, &self.vendor)?;
+
+        if let Some(ref system) = self.system {
+            write!(f, "-{}", system)
+        } else {
+            Ok(())
+        }?;
 
         if let Some(ref abi) = self.abi {
             write!(f, "-{}", abi)
@@ -89,7 +91,7 @@ fn ndk_major_version(ndk_dir: &Path) -> u32 {
 fn main() {
     let target_str = env::var("TARGET").unwrap();
     let target: Vec<String> = target_str.split('-').map(|s| s.into()).collect();
-    assert!(target.len() >= 3, "Failed to parse TARGET {}", target_str);
+    assert!(target.len() >= 2, "Failed to parse TARGET {}", target_str);
 
     let abi = if target.len() > 3 {
         Some(target[3].clone())
@@ -97,10 +99,16 @@ fn main() {
         None
     };
 
+    let system = if target.len() > 2 {
+        Some(target[2].clone())
+    } else {
+        None
+    };
+
     let target = Target {
         architecture: target[0].clone(),
         vendor: target[1].clone(),
-        system: target[2].clone(),
+        system,
         abi,
     };
 
@@ -119,8 +127,8 @@ fn main() {
     // Except for Emscripten target (which emulates POSIX environment), compile to Wasm via WASI SDK
     // which is currently the only standalone provider of stdlib for compilation of C/C++ libraries.
 
-    match target.system.as_str() {
-        "android" | "androideabi" => {
+    match target.system.as_deref() {
+        Some("android" | "androideabi") => {
             let ndk = ndk();
             let major = ndk_major_version(Path::new(&ndk));
             if major < 22 {
