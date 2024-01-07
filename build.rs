@@ -1,13 +1,9 @@
-use std::{env, fmt};
+use regex::Regex;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use regex::Regex;
-
-// Taken from https://github.com/Brooooooklyn/ada-url/blob/main/ada/build.rs
-
-
+use std::{env, fmt};
 
 #[derive(Clone, Debug)]
 pub struct Target {
@@ -57,7 +53,6 @@ pub fn target_arch(arch: &str) -> &str {
     }
 }
 
-
 fn host_tag() -> String {
     // Because this is part of build.rs, the target_os is actually the host system
     if cfg!(target_os = "windows") {
@@ -69,9 +64,8 @@ fn host_tag() -> String {
     } else {
         panic!("host os is not supported")
     }
-        .to_string()
+    .to_string()
 }
-
 
 /// Get NDK major version from source.properties
 fn ndk_major_version(ndk_dir: &Path) -> u32 {
@@ -92,16 +86,7 @@ fn ndk_major_version(ndk_dir: &Path) -> u32 {
     captures[1].parse().expect("could not parse major version")
 }
 
-
-
 fn main() {
-    println!("cargo:rerun-if-changed=deps/ada.cpp");
-    println!("cargo:rerun-if-changed=deps/ada.h");
-    println!("cargo:rerun-if-changed=deps/ada_c.h");
-
-
-
-
     let target_str = env::var("TARGET").unwrap();
     let target: Vec<String> = target_str.split('-').map(|s| s.into()).collect();
     if target.len() < 3 {
@@ -121,9 +106,6 @@ fn main() {
         abi,
     };
 
-
-
-
     let mut build = cc::Build::new();
     build
         .file("./deps/ada.cpp")
@@ -139,14 +121,13 @@ fn main() {
     // Except for Emscripten target (which emulates POSIX environment), compile to Wasm via WASI SDK
     // which is currently the only standalone provider of stdlib for compilation of C/C++ libraries.
 
-
     match target.system.as_str() {
         "android" | "androideabi" => {
             let ndk = ndk();
             let major = ndk_major_version(Path::new(&ndk));
             if major < 22 {
-                 build
-                    .flag( &format!("--sysroot={}/sysroot", ndk))
+                build
+                    .flag(&format!("--sysroot={}/sysroot", ndk))
                     .flag(&format!(
                         "-isystem{}/sources/cxx-stl/llvm-libc++/include",
                         ndk
@@ -158,7 +139,7 @@ fn main() {
                 build.flag(&format!("--sysroot={}/sysroot", host_toolchain));
             }
         }
-        _ =>{
+        _ => {
             if compile_target_arch.starts_with("wasm") && compile_target_os != "emscripten" {
                 let wasi_sdk = env::var("WASI_SDK").unwrap_or_else(|_| "/opt/wasi-sdk".to_owned());
                 assert!(
@@ -172,7 +153,9 @@ fn main() {
                     }
                     _ => "wasm32-wasi",
                 };
-                println!("cargo:rustc-link-search={wasi_sdk}/share/wasi-sysroot/lib/{wasi_sysroot_lib}");
+                println!(
+                    "cargo:rustc-link-search={wasi_sdk}/share/wasi-sysroot/lib/{wasi_sysroot_lib}"
+                );
                 // Wasm exceptions are new and not yet supported by WASI SDK.
                 build.flag("-fno-exceptions");
                 // WASI SDK only has libc++ available.
@@ -197,21 +180,17 @@ fn main() {
             if compiler.is_like_msvc() {
                 build.static_crt(true);
                 link_args::windows! {
-            unsafe {
-                no_default_lib(
-                    "libcmt.lib",
-                );
-            }
-        };
+                    unsafe {
+                        no_default_lib(
+                            "libcmt.lib",
+                        );
+                    }
+                };
             } else if compiler.is_like_clang() && cfg!(feature = "libcpp") {
                 build.cpp_set_stdlib("c++");
             }
-
         }
     }
-
-
-
 
     build.compile("ada");
 }
