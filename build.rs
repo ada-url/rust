@@ -55,7 +55,7 @@ pub fn target_arch(arch: &str) -> &str {
     }
 }
 
-fn host_tag() -> String {
+fn host_tag() -> &'static str {
     // Because this is part of build.rs, the target_os is actually the host system
     if cfg!(target_os = "windows") {
         "windows-x86_64"
@@ -66,7 +66,6 @@ fn host_tag() -> String {
     } else {
         panic!("host os is not supported")
     }
-    .to_string()
 }
 
 /// Get NDK major version from source.properties
@@ -76,7 +75,7 @@ fn ndk_major_version(ndk_dir: &Path) -> u32 {
     // There's a source.properties file in the ndk directory, which contains
     let mut source_properties =
         File::open(ndk_dir.join("source.properties")).expect("Couldn't open source.properties");
-    let mut buf = "".to_string();
+    let mut buf = String::new();
     source_properties
         .read_to_string(&mut buf)
         .expect("Could not read source.properties");
