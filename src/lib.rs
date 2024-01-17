@@ -729,7 +729,9 @@ impl PartialEq for Url {
 }
 
 impl PartialOrd for Url {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> { Some(self.cmp(other)) }
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for Url {
