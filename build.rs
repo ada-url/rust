@@ -120,7 +120,6 @@ fn main() {
 
     let compile_target_arch = env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH");
     let compile_target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS");
-    let compile_target_env = env::var("CARGO_CFG_TARGET_ENV").expect("CARGO_CFG_TARGET_ENV");
     let compile_target_feature = env::var("CARGO_CFG_TARGET_FEATURE");
     // Except for Emscripten target (which emulates POSIX environment), compile to Wasm via WASI SDK
     // which is currently the only standalone provider of stdlib for compilation of C/C++ libraries.
@@ -174,8 +173,6 @@ fn main() {
                     println!("cargo:rustc-link-lib=c");
                     build.file("./deps/wasi_to_unknown.cpp");
                 }
-            } else if !(compile_target_os == "windows" && compile_target_env == "msvc") {
-                build.compiler("clang++");
             }
 
             let compiler = build.get_compiler();
