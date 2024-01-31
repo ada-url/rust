@@ -114,8 +114,7 @@ fn main() {
     let mut build = cc::Build::new();
     build
         .file("./deps/ada.cpp")
-        .include("./deps/ada.h")
-        .include("./deps/ada_c.h")
+        .include("./deps")
         .cpp(true)
         .std("c++17");
 
