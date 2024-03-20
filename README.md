@@ -12,7 +12,7 @@ See [here](examples/simple.rs) for a usage example.
 You can run it locally with `cargo run --example simple`.
 Feel free to adjust it for exploring this crate further.
 
-#### Features
+### Features
 
 **std:** Functionalities that require `std`.
 This feature is enabled by default, set `no-default-features` to `true` if you want `no-std`.
