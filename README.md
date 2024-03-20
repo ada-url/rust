@@ -12,7 +12,7 @@ Here is an example illustrating a common usage:
 
 ```Rust
 use ada_url::Url;
-fn main() -> Result<(), ()> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut u = Url::parse("http://www.google:8080/love#drug", None).expect("bad url");
     println!("port: {:?}", u.port());
     println!("hash: {:?}", u.hash());
