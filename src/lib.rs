@@ -70,10 +70,10 @@ pub enum HostType {
 impl From<c_uint> for HostType {
     fn from(value: c_uint) -> Self {
         match value {
-            0 => HostType::Domain,
-            1 => HostType::IPV4,
-            2 => HostType::IPV6,
-            _ => HostType::Domain,
+            0 => Self::Domain,
+            1 => Self::IPV4,
+            2 => Self::IPV6,
+            _ => Self::Domain,
         }
     }
 }
@@ -93,14 +93,14 @@ pub enum SchemeType {
 impl From<c_uint> for SchemeType {
     fn from(value: c_uint) -> Self {
         match value {
-            0 => SchemeType::Http,
-            1 => SchemeType::NotSpecial,
-            2 => SchemeType::Https,
-            3 => SchemeType::Ws,
-            4 => SchemeType::Ftp,
-            5 => SchemeType::Wss,
-            6 => SchemeType::File,
-            _ => SchemeType::NotSpecial,
+            0 => Self::Http,
+            1 => Self::NotSpecial,
+            2 => Self::Https,
+            3 => Self::Ws,
+            4 => Self::Ftp,
+            5 => Self::Wss,
+            6 => Self::File,
+            _ => Self::NotSpecial,
         }
     }
 }
@@ -187,7 +187,7 @@ impl std::error::Error for SetterError {}
 type SetterResult = Result<(), SetterError>;
 
 #[inline]
-fn setter_result(successful: bool) -> SetterResult {
+const fn setter_result(successful: bool) -> SetterResult {
     if successful {
         Ok(())
     } else {
@@ -204,7 +204,7 @@ impl Url {
     ///     .expect("This is a valid URL. Should have parsed it.");
     /// assert_eq!(out.protocol(), "https:");
     /// ```
-    pub fn parse<Input>(input: Input, base: Option<&str>) -> Result<Url, ParseUrlError<Input>>
+    pub fn parse<Input>(input: Input, base: Option<&str>) -> Result<Self, ParseUrlError<Input>>
     where
         Input: AsRef<str>,
     {
@@ -236,6 +236,7 @@ impl Url {
     /// assert!(Url::can_parse("https://ada-url.github.io/ada", None));
     /// assert!(Url::can_parse("/pathname", Some("https://ada-url.github.io/ada")));
     /// ```
+    #[must_use]
     pub fn can_parse(input: &str, base: Option<&str>) -> bool {
         unsafe {
             if let Some(base) = base {
@@ -252,11 +253,13 @@ impl Url {
     }
 
     /// Returns the type of the host such as default, ipv4 or ipv6.
+    #[must_use]
     pub fn host_type(&self) -> HostType {
         HostType::from(unsafe { ffi::ada_get_host_type(self.0) })
     }
 
     /// Returns the type of the scheme such as http, https, etc.
+    #[must_use]
     pub fn scheme_type(&self) -> SchemeType {
         SchemeType::from(unsafe { ffi::ada_get_scheme_type(self.0) })
     }
@@ -271,6 +274,7 @@ impl Url {
     /// let url = Url::parse("blob:https://example.com/foo", None).expect("Invalid URL");
     /// assert_eq!(url.origin(), "https://example.com");
     /// ```
+    #[must_use]
     pub fn origin(&self) -> &str {
         unsafe {
             let out = ffi::ada_get_origin(self.0);
@@ -282,6 +286,7 @@ impl Url {
     /// Return the parsed version of the URL with all components.
     ///
     /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-href)
+    #[must_use]
     pub fn href(&self) -> &str {
         unsafe { ffi::ada_get_href(self.0) }.as_str()
     }
@@ -309,6 +314,7 @@ impl Url {
     /// let url = Url::parse("ftp://rms:secret123@example.com", None).expect("Invalid URL");
     /// assert_eq!(url.username(), "rms");
     /// ```
+    #[must_use]
     pub fn username(&self) -> &str {
         unsafe { ffi::ada_get_username(self.0) }.as_str()
     }
@@ -327,7 +333,7 @@ impl Url {
             ffi::ada_set_username(
                 self.0,
                 input.unwrap_or("").as_ptr().cast(),
-                input.map_or(0, |i| i.len()),
+                input.map_or(0, str::len),
             )
         })
     }
@@ -342,6 +348,7 @@ impl Url {
     /// let url = Url::parse("ftp://rms:secret123@example.com", None).expect("Invalid URL");
     /// assert_eq!(url.password(), "secret123");
     /// ```
+    #[must_use]
     pub fn password(&self) -> &str {
         unsafe { ffi::ada_get_password(self.0) }.as_str()
     }
@@ -360,7 +367,7 @@ impl Url {
             ffi::ada_set_password(
                 self.0,
                 input.unwrap_or("").as_ptr().cast(),
-                input.map_or(0, |i| i.len()),
+                input.map_or(0, str::len),
             )
         })
     }
@@ -378,6 +385,7 @@ impl Url {
     /// let url = Url::parse("https://example.com:8080", None).expect("Invalid URL");
     /// assert_eq!(url.port(), "8080");
     /// ```
+    #[must_use]
     pub fn port(&self) -> &str {
         unsafe { ffi::ada_get_port(self.0) }.as_str()
     }
@@ -392,14 +400,11 @@ impl Url {
     /// assert_eq!(url.href(), "https://yagiz.co:8080/");
     /// ```
     pub fn set_port(&mut self, input: Option<&str>) -> SetterResult {
-        match input {
-            Some(value) => setter_result(unsafe {
-                ffi::ada_set_port(self.0, value.as_ptr().cast(), value.len())
-            }),
-            None => {
-                unsafe { ffi::ada_clear_port(self.0) }
-                Ok(())
-            }
+        if let Some(value) = input {
+            setter_result(unsafe { ffi::ada_set_port(self.0, value.as_ptr().cast(), value.len()) })
+        } else {
+            unsafe { ffi::ada_clear_port(self.0) }
+            Ok(())
         }
     }
 
@@ -420,6 +425,7 @@ impl Url {
     /// assert_eq!(url.hash(), "#row=4");
     /// assert!(url.has_hash());
     /// ```
+    #[must_use]
     pub fn hash(&self) -> &str {
         unsafe { ffi::ada_get_hash(self.0) }.as_str()
     }
@@ -450,6 +456,7 @@ impl Url {
     /// let url = Url::parse("https://127.0.0.1:8080/index.html", None).expect("Invalid URL");
     /// assert_eq!(url.host(), "127.0.0.1:8080");
     /// ```
+    #[must_use]
     pub fn host(&self) -> &str {
         unsafe { ffi::ada_get_host(self.0) }.as_str()
     }
@@ -468,7 +475,7 @@ impl Url {
             ffi::ada_set_host(
                 self.0,
                 input.unwrap_or("").as_ptr().cast(),
-                input.map_or(0, |i| i.len()),
+                input.map_or(0, str::len),
             )
         })
     }
@@ -487,6 +494,7 @@ impl Url {
     /// let url = Url::parse("https://127.0.0.1:8080/index.html", None).expect("Invalid URL");
     /// assert_eq!(url.hostname(), "127.0.0.1");
     /// ```
+    #[must_use]
     pub fn hostname(&self) -> &str {
         unsafe { ffi::ada_get_hostname(self.0) }.as_str()
     }
@@ -505,7 +513,7 @@ impl Url {
             ffi::ada_set_hostname(
                 self.0,
                 input.unwrap_or("").as_ptr().cast(),
-                input.map_or(0, |i| i.len()),
+                input.map_or(0, str::len),
             )
         })
     }
@@ -520,6 +528,7 @@ impl Url {
     /// let url = Url::parse("https://example.com/api/versions?page=2", None).expect("Invalid URL");
     /// assert_eq!(url.pathname(), "/api/versions");
     /// ```
+    #[must_use]
     pub fn pathname(&self) -> &str {
         unsafe { ffi::ada_get_pathname(self.0) }.as_str()
     }
@@ -538,7 +547,7 @@ impl Url {
             ffi::ada_set_pathname(
                 self.0,
                 input.unwrap_or("").as_ptr().cast(),
-                input.map_or(0, |i| i.len()),
+                input.map_or(0, str::len),
             )
         })
     }
@@ -556,6 +565,7 @@ impl Url {
     /// let url = Url::parse("https://example.com/products", None).expect("Invalid URL");
     /// assert_eq!(url.search(), "");
     /// ```
+    #[must_use]
     pub fn search(&self) -> &str {
         unsafe { ffi::ada_get_search(self.0) }.as_str()
     }
@@ -572,7 +582,7 @@ impl Url {
     pub fn set_search(&mut self, input: Option<&str>) {
         match input {
             Some(value) => unsafe {
-                ffi::ada_set_search(self.0, value.as_ptr().cast(), value.len())
+                ffi::ada_set_search(self.0, value.as_ptr().cast(), value.len());
             },
             None => unsafe { ffi::ada_clear_search(self.0) },
         }
@@ -588,6 +598,7 @@ impl Url {
     /// let url = Url::parse("file:///tmp/foo", None).expect("Invalid URL");
     /// assert_eq!(url.protocol(), "file:");
     /// ```
+    #[must_use]
     pub fn protocol(&self) -> &str {
         unsafe { ffi::ada_get_protocol(self.0) }.as_str()
     }
@@ -606,46 +617,55 @@ impl Url {
     }
 
     /// A URL includes credentials if its username or password is not the empty string.
+    #[must_use]
     pub fn has_credentials(&self) -> bool {
         unsafe { ffi::ada_has_credentials(self.0) }
     }
 
     /// Returns true if it has an host but it is the empty string.
+    #[must_use]
     pub fn has_empty_hostname(&self) -> bool {
         unsafe { ffi::ada_has_empty_hostname(self.0) }
     }
 
     /// Returns true if it has a host (included an empty host)
+    #[must_use]
     pub fn has_hostname(&self) -> bool {
         unsafe { ffi::ada_has_hostname(self.0) }
     }
 
     /// Returns true if URL has a non-empty username.
+    #[must_use]
     pub fn has_non_empty_username(&self) -> bool {
         unsafe { ffi::ada_has_non_empty_username(self.0) }
     }
 
     /// Returns true if URL has a non-empty password.
+    #[must_use]
     pub fn has_non_empty_password(&self) -> bool {
         unsafe { ffi::ada_has_non_empty_password(self.0) }
     }
 
     /// Returns true if URL has a port.
+    #[must_use]
     pub fn has_port(&self) -> bool {
         unsafe { ffi::ada_has_port(self.0) }
     }
 
     /// Returns true if URL has password.
+    #[must_use]
     pub fn has_password(&self) -> bool {
         unsafe { ffi::ada_has_password(self.0) }
     }
 
     /// Returns true if URL has a hash/fragment.
+    #[must_use]
     pub fn has_hash(&self) -> bool {
         unsafe { ffi::ada_has_hash(self.0) }
     }
 
     /// Returns true if URL has search/query.
+    #[must_use]
     pub fn has_search(&self) -> bool {
         unsafe { ffi::ada_has_search(self.0) }
     }
@@ -653,11 +673,13 @@ impl Url {
     /// Returns the parsed version of the URL with all components.
     ///
     /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-href)
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.href()
     }
 
     /// Returns the URL components of the instance.
+    #[must_use]
     pub fn components(&self) -> UrlComponents {
         unsafe { ffi::ada_get_components(self.0).as_ref().unwrap() }.into()
     }
@@ -739,7 +761,7 @@ impl Ord for Url {
 
 impl hash::Hash for Url {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.href().hash(state)
+        self.href().hash(state);
     }
 }
 

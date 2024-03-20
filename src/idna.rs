@@ -1,6 +1,6 @@
 use crate::ffi;
 
-/// IDNA struct implements the to_ascii and to_unicode functions from the Unicode Technical
+/// IDNA struct implements the `to_ascii` and `to_unicode` functions from the Unicode Technical
 /// Standard supporting a wide range of systems. It is suitable for URL parsing.
 /// For more information, [read the specification](https://www.unicode.org/reports/tr46/#ToUnicode)
 pub struct Idna {}
@@ -15,6 +15,7 @@ impl Idna {
     /// use ada_url::Idna;
     /// assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca"), "meßagefactory.ca");
     /// ```
+    #[must_use]
     pub fn unicode(input: &str) -> &str {
         unsafe {
             let out = ffi::ada_idna_to_unicode(input.as_ptr().cast(), input.len());
@@ -32,6 +33,7 @@ impl Idna {
     /// use ada_url::Idna;
     /// assert_eq!(Idna::ascii("meßagefactory.ca"), "xn--meagefactory-m9a.ca");
     /// ```
+    #[must_use]
     pub fn ascii(input: &str) -> &str {
         unsafe {
             let out = ffi::ada_idna_to_ascii(input.as_ptr().cast(), input.len());

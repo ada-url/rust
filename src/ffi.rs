@@ -14,7 +14,8 @@ pub struct ada_string {
 }
 
 impl ada_string {
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         unsafe {
             let slice = core::slice::from_raw_parts(self.data.cast(), self.length);
             core::str::from_utf8_unchecked(slice)
