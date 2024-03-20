@@ -180,9 +180,8 @@ impl From<*mut ffi::ada_url> for Url {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Display)]
+#[cfg_attr(feature = "std", derive(derive_more::Error))] // error still requires std: https://github.com/rust-lang/rust/issues/103765
 pub struct SetterError;
-
-impl std::error::Error for SetterError {}
 
 type SetterResult = Result<(), SetterError>;
 
