@@ -8,22 +8,9 @@ It fully supports the relevant [Unicode Technical Standard](https://www.unicode.
 
 ### Usage
 
-Here is an example illustrating a common usage:
-
-```Rust
-use ada_url::Url;
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut u = Url::parse("http://www.google:8080/love#drug", None).expect("bad url");
-    println!("port: {:?}", u.port());
-    println!("hash: {:?}", u.hash());
-    println!("pathname: {:?}", u.pathname());
-    println!("href: {:?}", u.href());
-    u.set_port(Some("9999"))?;
-    println!("href: {:?}", u.href());
-
-    Ok(())
-}
-```
+See [here](examples/simple.rs) for a usage example.
+You can run it locally with `cargo run --example simple`.
+Feel free to adjust it for exploring this crate further.
 
 #### Features
 
