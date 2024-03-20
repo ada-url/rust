@@ -12,14 +12,16 @@ Here is an example illustrating a common usage:
 
 ```Rust
 use ada_url::Url;
-fn main() {
+fn main() -> Result<(), ()> {
     let mut u = Url::parse("http://www.google:8080/love#drug", None).expect("bad url");
     println!("port: {:?}", u.port());
     println!("hash: {:?}", u.hash());
     println!("pathname: {:?}", u.pathname());
     println!("href: {:?}", u.href());
-    u.set_port(Some("9999"));
+    u.set_port(Some("9999"))?;
     println!("href: {:?}", u.href());
+
+    Ok(())
 }
 ```
 
