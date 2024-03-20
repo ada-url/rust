@@ -1,4 +1,4 @@
-## WHATWG URL parser for Rust
+# WHATWG URL parser for Rust
 
 Fast [WHATWG URL Specification](https://url.spec.whatwg.org) compliant URL parser for Rust.
 Well-tested and widely used by Node.js since [Node 18](https://nodejs.org/en/blog/release/v18.17.0).
@@ -6,7 +6,7 @@ Well-tested and widely used by Node.js since [Node 18](https://nodejs.org/en/blo
 The Ada library passes the full range of tests from the specification, across a wide range of platforms (e.g., Windows, Linux, macOS).
 It fully supports the relevant [Unicode Technical Standard](https://www.unicode.org/reports/tr46/#ToUnicode).
 
-### Usage
+## Usage
 
 See [here](examples/simple.rs) for a usage example.
 You can run it locally with `cargo run --example simple`.
@@ -27,7 +27,7 @@ Enabling this feature without `libc++` installed would cause compile error.
 
 Ada is fast. The benchmark below shows **3.34 times** faster URL parsing compared to `url`
 
-```
+```text
 parse/ada_url           time:   [2.0790 µs 2.0812 µs 2.0835 µs]
                         thrpt:  [369.84 MiB/s 370.25 MiB/s 370.65 MiB/s]
 
@@ -54,9 +54,9 @@ parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
 | **[`Send`](https://doc.rust-lang.org/std/marker/trait.Send.html)**                                                                                    | Used to declare that the type can be transferred across thread boundaries.                                                                                                                                    |
 | **[`Sync`](https://doc.rust-lang.org/stable/std/marker/trait.Sync.html)**                                                                             | Used to declare that the type is thread-safe.                                                                                                                                                                 |
 
-### Development
+## Development
 
-#### `justfile`
+### `justfile`
 
 The [`justfile`](./justfile) contains commands (called "recipes") that can be executed by [just](https://github.com/casey/just) for convenience.
 
@@ -72,7 +72,7 @@ just all
 just all --skip=libcpp,serde
 ```
 
-### License
+## License
 
 This code is made available under the Apache License 2.0 as well as the MIT license.
 
