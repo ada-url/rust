@@ -44,7 +44,9 @@
 
 pub mod ffi;
 mod idna;
+mod url_search_params;
 pub use idna::Idna;
+pub use url_search_params::URLSearchParams;
 
 use core::{borrow, ffi::c_uint, fmt, hash, ops};
 use derive_more::Display;
