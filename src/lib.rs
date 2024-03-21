@@ -774,12 +774,6 @@ impl borrow::Borrow<str> for Url {
     }
 }
 
-impl borrow::Borrow<[u8]> for Url {
-    fn borrow(&self) -> &[u8] {
-        self.href().as_bytes()
-    }
-}
-
 impl AsRef<[u8]> for Url {
     fn as_ref(&self) -> &[u8] {
         self.href().as_bytes()
