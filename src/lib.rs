@@ -179,18 +179,14 @@ impl From<*mut ffi::ada_url> for Url {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Display)]
-#[cfg_attr(feature = "std", derive(derive_more::Error))] // error still requires std: https://github.com/rust-lang/rust/issues/103765
-pub struct SetterError;
-
-type SetterResult = Result<(), SetterError>;
+type SetterResult = Result<(), ()>;
 
 #[inline]
 const fn setter_result(successful: bool) -> SetterResult {
     if successful {
         Ok(())
     } else {
-        Err(SetterError)
+        Err(())
     }
 }
 
@@ -299,6 +295,7 @@ impl Url {
     /// url.set_href("https://lemire.me").unwrap();
     /// assert_eq!(url.href(), "https://lemire.me/");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_href(&mut self, input: &str) -> SetterResult {
         setter_result(unsafe { ffi::ada_set_href(self.0, input.as_ptr().cast(), input.len()) })
     }
@@ -327,6 +324,7 @@ impl Url {
     /// url.set_username(Some("username")).unwrap();
     /// assert_eq!(url.href(), "https://username@yagiz.co/");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_username(&mut self, input: Option<&str>) -> SetterResult {
         setter_result(unsafe {
             ffi::ada_set_username(
@@ -361,6 +359,7 @@ impl Url {
     /// url.set_password(Some("password")).unwrap();
     /// assert_eq!(url.href(), "https://:password@yagiz.co/");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_password(&mut self, input: Option<&str>) -> SetterResult {
         setter_result(unsafe {
             ffi::ada_set_password(
@@ -398,6 +397,7 @@ impl Url {
     /// url.set_port(Some("8080")).unwrap();
     /// assert_eq!(url.href(), "https://yagiz.co:8080/");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_port(&mut self, input: Option<&str>) -> SetterResult {
         if let Some(value) = input {
             setter_result(unsafe { ffi::ada_set_port(self.0, value.as_ptr().cast(), value.len()) })
@@ -469,6 +469,7 @@ impl Url {
     /// url.set_host(Some("localhost:3000")).unwrap();
     /// assert_eq!(url.href(), "https://localhost:3000/");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_host(&mut self, input: Option<&str>) -> SetterResult {
         setter_result(unsafe {
             ffi::ada_set_host(
@@ -507,6 +508,7 @@ impl Url {
     /// url.set_hostname(Some("localhost")).unwrap();
     /// assert_eq!(url.href(), "https://localhost/");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_hostname(&mut self, input: Option<&str>) -> SetterResult {
         setter_result(unsafe {
             ffi::ada_set_hostname(
@@ -541,6 +543,7 @@ impl Url {
     /// url.set_pathname(Some("/contact")).unwrap();
     /// assert_eq!(url.href(), "https://yagiz.co/contact");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_pathname(&mut self, input: Option<&str>) -> SetterResult {
         setter_result(unsafe {
             ffi::ada_set_pathname(
@@ -611,6 +614,7 @@ impl Url {
     /// url.set_protocol("http").unwrap();
     /// assert_eq!(url.href(), "http://yagiz.co/");
     /// ```
+    #[allow(clippy::result_unit_err)]
     pub fn set_protocol(&mut self, input: &str) -> SetterResult {
         setter_result(unsafe { ffi::ada_set_protocol(self.0, input.as_ptr().cast(), input.len()) })
     }

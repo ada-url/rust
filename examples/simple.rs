@@ -1,6 +1,6 @@
 use ada_url::Url;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let url = Url::parse("http://www.google:8080/love#drug", None).expect("bad url");
 
     println!("port: {:?}", url.port());
@@ -9,14 +9,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("href: {:?}", url.href());
 
     let mut url = url;
-
-    #[cfg(feature = "std")]
-    url.set_port(Some("9999"))?;
-
-    #[cfg(not(feature = "std"))]
-    url.set_port(Some("9999")).unwrap();
-
+    url.set_port(Some("9999")).expect("bad port");
     println!("href: {:?}", url.href());
-
-    Ok(())
 }
