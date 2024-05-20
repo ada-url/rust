@@ -267,15 +267,11 @@ impl Url {
     /// use ada_url::Url;
     ///
     /// let url = Url::parse("blob:https://example.com/foo", None).expect("Invalid URL");
-    /// assert_eq!(url.origin(), "https://example.com");
+    /// assert_eq!(url.origin().as_ref(), "https://example.com");
     /// ```
     #[must_use]
-    pub fn origin(&self) -> &str {
-        unsafe {
-            let out = ffi::ada_get_origin(self.0);
-            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
-            core::str::from_utf8_unchecked(slice)
-        }
+    pub fn origin(&self) -> ffi::ada_owned_string {
+        unsafe { ffi::ada_get_origin(self.0) }
     }
 
     /// Return the parsed version of the URL with all components.
@@ -949,7 +945,7 @@ mod test {
             None,
         )
         .expect("Should have parsed a simple url");
-        assert_eq!(out.origin(), "https://google.com:9090");
+        assert_eq!(out.origin().as_ref(), "https://google.com:9090");
         assert_eq!(
             out.href(),
             "https://username:password@google.com:9090/search?query#hash"

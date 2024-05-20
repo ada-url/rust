@@ -13,15 +13,11 @@ impl Idna {
     ///
     /// ```
     /// use ada_url::Idna;
-    /// assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca"), "meßagefactory.ca");
+    /// assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca").as_ref(), "meßagefactory.ca");
     /// ```
     #[must_use]
-    pub fn unicode(input: &str) -> &str {
-        unsafe {
-            let out = ffi::ada_idna_to_unicode(input.as_ptr().cast(), input.len());
-            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
-            core::str::from_utf8_unchecked(slice)
-        }
+    pub fn unicode(input: &str) -> ffi::ada_owned_string {
+        unsafe { ffi::ada_idna_to_unicode(input.as_ptr().cast(), input.len()) }
     }
 
     /// Process international domains according to the UTS #46 standard.
@@ -31,15 +27,11 @@ impl Idna {
     ///
     /// ```
     /// use ada_url::Idna;
-    /// assert_eq!(Idna::ascii("meßagefactory.ca"), "xn--meagefactory-m9a.ca");
+    /// assert_eq!(Idna::ascii("meßagefactory.ca").as_ref(), "xn--meagefactory-m9a.ca");
     /// ```
     #[must_use]
-    pub fn ascii(input: &str) -> &str {
-        unsafe {
-            let out = ffi::ada_idna_to_ascii(input.as_ptr().cast(), input.len());
-            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
-            core::str::from_utf8_unchecked(slice)
-        }
+    pub fn ascii(input: &str) -> ffi::ada_owned_string {
+        unsafe { ffi::ada_idna_to_ascii(input.as_ptr().cast(), input.len()) }
     }
 }
 
@@ -49,11 +41,17 @@ mod tests {
 
     #[test]
     fn unicode_should_work() {
-        assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca"), "meßagefactory.ca");
+        assert_eq!(
+            Idna::unicode("xn--meagefactory-m9a.ca").as_ref(),
+            "meßagefactory.ca"
+        );
     }
 
     #[test]
     fn ascii_should_work() {
-        assert_eq!(Idna::ascii("meßagefactory.ca"), "xn--meagefactory-m9a.ca");
+        assert_eq!(
+            Idna::ascii("meßagefactory.ca").as_ref(),
+            "xn--meagefactory-m9a.ca"
+        );
     }
 }
