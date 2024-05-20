@@ -1,6 +1,9 @@
 #![allow(non_camel_case_types)]
 use core::ffi::{c_char, c_uint};
 
+#[cfg(feature = "std")]
+extern crate std;
+
 #[repr(C)]
 pub struct ada_url {
     _unused: [u8; 0],
@@ -35,6 +38,13 @@ impl AsRef<str> for ada_owned_string {
             let slice = core::slice::from_raw_parts(self.data.cast(), self.length);
             core::str::from_utf8_unchecked(slice)
         }
+    }
+}
+
+#[cfg(feature = "std")]
+impl ToString for ada_owned_string {
+    fn to_string(&self) -> std::string::String {
+        self.as_ref().to_owned()
     }
 }
 
