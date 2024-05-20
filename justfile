@@ -3,9 +3,14 @@ _default:
 
 # run doc, clippy, and test recipies
 all *args:
+  just fmt {{args}}
   just doc {{args}}
   just clippy {{args}}
   just test {{args}}
+
+# Format all code
+fmt *args:
+  cargo fmt --all {{args}}
 
 # run tests on all feature combinations
 test *args:
