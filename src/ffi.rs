@@ -59,7 +59,7 @@ extern "C" {
         base_length: usize,
     ) -> *mut ada_url;
     pub fn ada_free(url: *mut ada_url);
-    pub fn ada_free_owned_string(url: *mut ada_owned_string);
+    pub fn ada_free_owned_string(url: ada_owned_string);
     pub fn ada_copy(url: *mut ada_url) -> *mut ada_url;
     pub fn ada_is_valid(url: *mut ada_url) -> bool;
     pub fn ada_can_parse(url: *const c_char, length: usize) -> bool;
@@ -117,4 +117,17 @@ extern "C" {
     // IDNA methods
     pub fn ada_idna_to_unicode(input: *const c_char, length: usize) -> ada_owned_string;
     pub fn ada_idna_to_ascii(input: *const c_char, length: usize) -> ada_owned_string;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ffi;
+
+    #[test]
+    fn ada_free_owned_string_works() {
+        let str = "meßagefactory.ca";
+        let result = unsafe { ffi::ada_idna_to_ascii(str.as_ptr().cast(), str.len()) };
+        assert_eq!(result.as_ref(), "xn--meagefactory-m9a.ca");
+        unsafe { ffi::ada_free_owned_string(result) };
+    }
 }
