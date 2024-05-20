@@ -38,6 +38,19 @@ impl AsRef<str> for ada_owned_string {
     }
 }
 
+impl Drop for ada_owned_string {
+    fn drop(&mut self) {
+        // @note This is needed because ada_free_owned_string accepts by value
+        let copy = ada_owned_string {
+            data: self.data,
+            length: self.length,
+        };
+        unsafe {
+            ada_free_owned_string(copy);
+        };
+    }
+}
+
 #[repr(C)]
 pub struct ada_url_components {
     pub protocol_end: u32,
