@@ -59,7 +59,7 @@ extern "C" {
         base_length: usize,
     ) -> *mut ada_url;
     pub fn ada_free(url: *mut ada_url);
-    pub fn ada_free_owned_string(url: *mut ada_owned_string);
+    pub fn ada_free_owned_string(url: ada_owned_string);
     pub fn ada_copy(url: *mut ada_url) -> *mut ada_url;
     pub fn ada_is_valid(url: *mut ada_url) -> bool;
     pub fn ada_can_parse(url: *const c_char, length: usize) -> bool;
