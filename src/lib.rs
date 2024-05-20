@@ -46,6 +46,12 @@ pub mod ffi;
 mod idna;
 pub use idna::Idna;
 
+#[cfg(feature = "std")]
+extern crate std;
+
+#[cfg(feature = "std")]
+use std::string::String;
+
 use core::{borrow, ffi::c_uint, fmt, hash, ops};
 use derive_more::Display;
 
@@ -270,12 +276,9 @@ impl Url {
     /// assert_eq!(url.origin(), "https://example.com");
     /// ```
     #[must_use]
-    pub fn origin(&self) -> &str {
-        unsafe {
-            let out = ffi::ada_get_origin(self.0);
-            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
-            core::str::from_utf8_unchecked(slice)
-        }
+    #[cfg(feature = "std")]
+    pub fn origin(&self) -> String {
+        unsafe { ffi::ada_get_origin(self.0) }.to_string()
     }
 
     /// Return the parsed version of the URL with all components.
@@ -949,7 +952,10 @@ mod test {
             None,
         )
         .expect("Should have parsed a simple url");
+
+        #[cfg(feature = "std")]
         assert_eq!(out.origin(), "https://google.com:9090");
+
         assert_eq!(
             out.href(),
             "https://username:password@google.com:9090/search?query#hash"
