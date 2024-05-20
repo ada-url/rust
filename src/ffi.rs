@@ -118,3 +118,16 @@ extern "C" {
     pub fn ada_idna_to_unicode(input: *const c_char, length: usize) -> ada_owned_string;
     pub fn ada_idna_to_ascii(input: *const c_char, length: usize) -> ada_owned_string;
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::ffi;
+
+    #[test]
+    fn ada_free_owned_string_works() {
+        let str = "meßagefactory.ca";
+        let result = unsafe {ffi::ada_idna_to_ascii(str.as_ptr().cast(), str.len())};
+        assert_eq!(result.as_ref(), "xn--meagefactory-m9a.ca");
+        unsafe {ffi::ada_free_owned_string(result)};
+    }
+}
