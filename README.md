@@ -25,14 +25,17 @@ Enabling this feature without `libc++` installed would cause compile error.
 
 ### Performance
 
-Ada is fast. The benchmark below shows **3.34 times** faster URL parsing compared to `url`
+Ada is fast. The benchmark below shows **3.49 times** faster URL parsing compared to `url`
 
 ```text
-parse/ada_url           time:   [2.0790 µs 2.0812 µs 2.0835 µs]
-                        thrpt:  [369.84 MiB/s 370.25 MiB/s 370.65 MiB/s]
+can_parse/ada_url       time:   [1.2109 µs 1.2121 µs 1.2133 µs]
+                        thrpt:  [635.09 MiB/s 635.75 MiB/s 636.38 MiB/s]
 
-parse/url               time:   [6.9266 µs 6.9677 µs 7.0199 µs]
-                        thrpt:  [109.77 MiB/s 110.59 MiB/s 111.25 MiB/s]
+parse/ada_url           time:   [2.0124 µs 2.0157 µs 2.0190 µs]
+                        thrpt:  [381.67 MiB/s 382.28 MiB/s 382.91 MiB/s]
+
+parse/url               time:   [7.0530 µs 7.0597 µs 7.0666 µs]
+                        thrpt:  [109.04 MiB/s 109.15 MiB/s 109.25 MiB/s]
 ```
 
 ### Implemented traits
