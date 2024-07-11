@@ -4,6 +4,9 @@ use core::ffi::{c_char, c_uint};
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "std")]
+use std::fmt::Display;
+
 #[repr(C)]
 pub struct ada_url {
     _unused: [u8; 0],
@@ -42,9 +45,9 @@ impl AsRef<str> for ada_owned_string {
 }
 
 #[cfg(feature = "std")]
-impl ToString for ada_owned_string {
-    fn to_string(&self) -> std::string::String {
-        self.as_ref().to_owned()
+impl Display for ada_owned_string {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.as_ref().to_owned())
     }
 }
 
