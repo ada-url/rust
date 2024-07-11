@@ -34,5 +34,19 @@ pub fn parse_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, parse_benchmark);
+pub fn can_parse_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("can_parse");
+    group.throughput(Throughput::Bytes(URLS.iter().map(|u| u.len() as u64).sum()));
+    group.bench_function("ada_url", |b| {
+        b.iter(|| {
+            URLS.iter().for_each(|url| {
+                let _ = ada_url::Url::can_parse(*black_box(url), None);
+            })
+        })
+    });
+    // TODO: Add `url` crate when it supports can_parse function.
+    group.finish();
+}
+
+criterion_group!(benches, parse_benchmark, can_parse_benchmark);
 criterion_main!(benches);
