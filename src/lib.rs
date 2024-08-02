@@ -228,7 +228,7 @@ impl Url {
         }
     }
 
-    /// Returns whether or not the URL can be parsed or not.
+    /// Returns whether the URL can be parsed or not.
     ///
     /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-canparse)
     ///
@@ -414,7 +414,7 @@ impl Url {
     /// A fragment is the part of the URL with the # symbol.
     /// The fragment is optional and, if present, contains a fragment identifier that identifies
     /// a secondary resource, such as a section heading of a document.
-    /// In HTML, the fragment identifier is usually the id attribute of a an element that is
+    /// In HTML, the fragment identifier is usually the id attribute of an element that is
     /// scrolled to on load. Browsers typically will not send the fragment portion of a URL to the
     /// server.
     ///
@@ -628,7 +628,7 @@ impl Url {
         unsafe { ffi::ada_has_credentials(self.0) }
     }
 
-    /// Returns true if it has an host but it is the empty string.
+    /// Returns true if it has a host, but it is the empty string.
     #[must_use]
     pub fn has_empty_hostname(&self) -> bool {
         unsafe { ffi::ada_has_empty_hostname(self.0) }
