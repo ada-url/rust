@@ -66,6 +66,7 @@ pub struct ParseUrlError<Input> {
 }
 
 /// Defines the type of the host.
+#[repr(u32)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostType {
     Domain = 0,
@@ -75,16 +76,18 @@ pub enum HostType {
 
 impl From<c_uint> for HostType {
     fn from(value: c_uint) -> Self {
-        match value {
-            0 => Self::Domain,
-            1 => Self::IPV4,
-            2 => Self::IPV6,
-            _ => Self::Domain,
+        if value > 2 {
+            return Self::Domain;
         }
+
+        // Safety: Prior to transmuting we checked if value is bigger than 2
+        // and returned the default in that case.
+        unsafe { std::mem::transmute(value) }
     }
 }
 
 /// Defines the scheme type of the url.
+#[repr(u32)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SchemeType {
     Http = 0,
@@ -98,16 +101,13 @@ pub enum SchemeType {
 
 impl From<c_uint> for SchemeType {
     fn from(value: c_uint) -> Self {
-        match value {
-            0 => Self::Http,
-            1 => Self::NotSpecial,
-            2 => Self::Https,
-            3 => Self::Ws,
-            4 => Self::Ftp,
-            5 => Self::Wss,
-            6 => Self::File,
-            _ => Self::NotSpecial,
+        if value > 6 {
+            return Self::NotSpecial;
         }
+
+        // Safety: Prior to transmuting we checked if value is bigger than 6
+        // and returned the default in that case.
+        unsafe { std::mem::transmute(value) }
     }
 }
 
