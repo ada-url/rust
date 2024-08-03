@@ -82,7 +82,13 @@ impl From<c_uint> for HostType {
 
         // Safety: Prior to transmuting we checked if value is bigger than 2
         // and returned the default in that case.
-        unsafe { std::mem::transmute(value) }
+        //
+        // Mapping:
+        // - 0 => Domain
+        // - 1 => IPV4
+        // - 2 => IPV6
+        // - any other number maps to NotSpecial
+        unsafe { std::mem::transmute(value as u32) }
     }
 }
 
@@ -107,7 +113,17 @@ impl From<c_uint> for SchemeType {
 
         // Safety: Prior to transmuting we checked if value is bigger than 6
         // and returned the default in that case.
-        unsafe { std::mem::transmute(value) }
+        //
+        // Mapping:
+        // - 0 => Http
+        // - 1 => NotSpecial
+        // - 2 => Https
+        // - 3 => Ws
+        // - 4 => Ftp
+        // - 5 => Wss
+        // - 6 => File
+        // - any other number maps to NotSpecial
+        unsafe { std::mem::transmute(value as u32) }
     }
 }
 
