@@ -1006,6 +1006,15 @@ mod test {
     }
 
     #[test]
+    fn parse_host_type() {
+        assert_eq!(HostType::from(0), HostType::Domain);
+        assert_eq!(HostType::from(1), HostType::IPV4);
+        assert_eq!(HostType::from(2), HostType::IPV6);
+        // Default from 3 .. u32::MAX inclusive
+        assert_eq!(HostType::from(3), HostType::Domain);
+    }
+
+    #[test]
     fn scheme_types() {
         assert_eq!(
             Url::parse("file:///foo/bar", None)
@@ -1049,6 +1058,18 @@ mod test {
                 .scheme_type(),
             SchemeType::NotSpecial
         );
+    }
+
+    fn parse_scheme_type() {
+        assert_eq!(SchemeType::from(0), SchemeType::Http);
+        assert_eq!(SchemeType::from(1), SchemeType::NotSpecial);
+        assert_eq!(SchemeType::from(2), SchemeType::Https);
+        assert_eq!(SchemeType::from(3), SchemeType::Ws);
+        assert_eq!(SchemeType::from(4), SchemeType::Ftp);
+        assert_eq!(SchemeType::from(5), SchemeType::Wss);
+        assert_eq!(SchemeType::from(6), SchemeType::File);
+        // Default from 7 .. u32::MAX inclusive
+        assert_eq!(SchemeType::from(7), SchemeType::NotSpecial);
     }
 
     #[test]
