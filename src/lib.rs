@@ -66,6 +66,7 @@ pub struct ParseUrlError<Input> {
 }
 
 /// Defines the type of the host.
+#[repr(u32)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostType {
     Domain = 0,
@@ -75,16 +76,24 @@ pub enum HostType {
 
 impl From<c_uint> for HostType {
     fn from(value: c_uint) -> Self {
-        match value {
-            0 => Self::Domain,
-            1 => Self::IPV4,
-            2 => Self::IPV6,
-            _ => Self::Domain,
+        if value > 2 {
+            return Self::Domain;
         }
+
+        // Safety: Prior to transmuting we checked if value is bigger than 2
+        // and returned the default in that case.
+        //
+        // Mapping:
+        // - 0 => Domain
+        // - 1 => IPV4
+        // - 2 => IPV6
+        // - any other number maps to NotSpecial
+        unsafe { std::mem::transmute(value as u32) }
     }
 }
 
 /// Defines the scheme type of the url.
+#[repr(u32)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SchemeType {
     Http = 0,
@@ -98,16 +107,23 @@ pub enum SchemeType {
 
 impl From<c_uint> for SchemeType {
     fn from(value: c_uint) -> Self {
-        match value {
-            0 => Self::Http,
-            1 => Self::NotSpecial,
-            2 => Self::Https,
-            3 => Self::Ws,
-            4 => Self::Ftp,
-            5 => Self::Wss,
-            6 => Self::File,
-            _ => Self::NotSpecial,
+        if value > 6 {
+            return Self::NotSpecial;
         }
+
+        // Safety: Prior to transmuting we checked if value is bigger than 6
+        // and returned the default in that case.
+        //
+        // Mapping:
+        // - 0 => Http
+        // - 1 => NotSpecial
+        // - 2 => Https
+        // - 3 => Ws
+        // - 4 => Ftp
+        // - 5 => Wss
+        // - 6 => File
+        // - any other number maps to NotSpecial
+        unsafe { std::mem::transmute(value as u32) }
     }
 }
 
@@ -228,7 +244,7 @@ impl Url {
         }
     }
 
-    /// Returns whether or not the URL can be parsed or not.
+    /// Returns whether the URL can be parsed or not.
     ///
     /// For more information, read [WHATWG URL spec](https://url.spec.whatwg.org/#dom-url-canparse)
     ///
@@ -414,7 +430,7 @@ impl Url {
     /// A fragment is the part of the URL with the # symbol.
     /// The fragment is optional and, if present, contains a fragment identifier that identifies
     /// a secondary resource, such as a section heading of a document.
-    /// In HTML, the fragment identifier is usually the id attribute of a an element that is
+    /// In HTML, the fragment identifier is usually the id attribute of an element that is
     /// scrolled to on load. Browsers typically will not send the fragment portion of a URL to the
     /// server.
     ///
@@ -628,7 +644,7 @@ impl Url {
         unsafe { ffi::ada_has_credentials(self.0) }
     }
 
-    /// Returns true if it has an host but it is the empty string.
+    /// Returns true if it has a host, but it is the empty string.
     #[must_use]
     pub fn has_empty_hostname(&self) -> bool {
         unsafe { ffi::ada_has_empty_hostname(self.0) }
@@ -1006,6 +1022,15 @@ mod test {
     }
 
     #[test]
+    fn parse_host_type() {
+        assert_eq!(HostType::from(0), HostType::Domain);
+        assert_eq!(HostType::from(1), HostType::IPV4);
+        assert_eq!(HostType::from(2), HostType::IPV6);
+        // Default from 3 .. u32::MAX inclusive
+        assert_eq!(HostType::from(3), HostType::Domain);
+    }
+
+    #[test]
     fn scheme_types() {
         assert_eq!(
             Url::parse("file:///foo/bar", None)
@@ -1049,6 +1074,18 @@ mod test {
                 .scheme_type(),
             SchemeType::NotSpecial
         );
+    }
+
+    fn parse_scheme_type() {
+        assert_eq!(SchemeType::from(0), SchemeType::Http);
+        assert_eq!(SchemeType::from(1), SchemeType::NotSpecial);
+        assert_eq!(SchemeType::from(2), SchemeType::Https);
+        assert_eq!(SchemeType::from(3), SchemeType::Ws);
+        assert_eq!(SchemeType::from(4), SchemeType::Ftp);
+        assert_eq!(SchemeType::from(5), SchemeType::Wss);
+        assert_eq!(SchemeType::from(6), SchemeType::File);
+        // Default from 7 .. u32::MAX inclusive
+        assert_eq!(SchemeType::from(7), SchemeType::NotSpecial);
     }
 
     #[test]
