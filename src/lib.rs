@@ -58,8 +58,8 @@ use derive_more::Display;
 /// Error type of [`Url::parse`].
 #[derive(Debug, Display, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(derive_more::Error))] // error still requires std: https://github.com/rust-lang/rust/issues/103765
-#[display(bound = "Input: core::fmt::Debug")]
-#[display(fmt = "Invalid url: {input:?}")]
+#[display(bound(Input: core::fmt::Debug))]
+#[display("Invalid url: {input:?}")]
 pub struct ParseUrlError<Input> {
     /// The invalid input that caused the error.
     pub input: Input,
