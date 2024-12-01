@@ -68,6 +68,7 @@ impl Drop for ada_owned_string {
             ada_free_owned_string(copy);
         };
     }
+}
 
 /// Represents an std::vector<std::string>
 #[repr(C)]
@@ -257,14 +258,14 @@ extern "C" {
     pub fn ada_free_search_params_keys_iter(iter: *mut ada_url_search_params_keys_iter);
     pub fn ada_search_params_keys_iter_next(
         iter: *mut ada_url_search_params_keys_iter,
-    ) -> *mut ada_string;
+    ) -> ada_string;
     pub fn ada_search_params_keys_iter_has_next(iter: *mut ada_url_search_params_keys_iter)
         -> bool;
 
     pub fn ada_free_search_params_values_iter(iter: *mut ada_url_search_params_values_iter);
     pub fn ada_search_params_values_iter_next(
         iter: *mut ada_url_search_params_values_iter,
-    ) -> *mut ada_string;
+    ) -> ada_string;
     pub fn ada_search_params_values_iter_has_next(
         iter: *mut ada_url_search_params_values_iter,
     ) -> bool;

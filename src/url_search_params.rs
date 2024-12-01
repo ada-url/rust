@@ -147,12 +147,10 @@ impl URLSearchParams {
     /// let params = URLSearchParams::parse("a=1&b=2");
     /// assert_eq!(params.to_string(), "a=1&b=2");
     /// ```
-    pub fn to_string(&self) -> &str {
-        unsafe {
-            let out = ffi::ada_search_params_to_string(self.0);
-            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
-            core::str::from_utf8_unchecked(slice)
-        }
+    #[cfg(feature = "std")]
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        unsafe { ffi::ada_search_params_to_string(self.0).to_string() }
     }
 
     /// Returns all values of the key.
@@ -160,25 +158,199 @@ impl URLSearchParams {
     /// ```
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1&a=2");
-    /// assert_eq!(params.get_all("a"), vec!["1", "2"]);
+    /// let pairs = params.get_all("a");
+    /// assert_eq!(pairs.get_size(), 2);
     /// ```
-    pub fn get_all(&self, key: &str) -> Vec<&str> {
+    pub fn get_all(&self, key: &str) -> URLSearchParamsEntry {
         unsafe {
             let strings = ffi::ada_search_params_get_all(self.0, key.as_ptr().cast(), key.len());
             let size = ffi::ada_strings_size(strings);
-            let mut out = Vec::with_capacity(size);
 
-            if size == 0 {
-                return out;
-            }
-
-            for index in 0..size {
-                let string = ffi::ada_strings_get(strings, index);
-                let slice = core::slice::from_raw_parts(string.data.cast(), string.length);
-                out.push(core::str::from_utf8_unchecked(slice));
-            }
-
-            out
+            URLSearchParamsEntry::new(strings, size)
         }
+    }
+
+    /// Returns all keys as an iterator
+    ///
+    /// ```
+    /// use ada_url::URLSearchParams;
+    /// let params = URLSearchParams::parse("a=1");
+    /// let mut keys = params.get_keys();
+    /// assert!(keys.has_next());
+    pub fn get_keys(&self) -> URLSearchParamsKeysIterator {
+        let iterator = unsafe { ffi::ada_search_params_get_keys(self.0) };
+        URLSearchParamsKeysIterator::new(iterator)
+    }
+
+    /// Returns all keys as an iterator
+    ///
+    /// ```
+    /// use ada_url::URLSearchParams;
+    /// let params = URLSearchParams::parse("a=1");
+    /// let mut values = params.get_values();
+    /// assert!(values.has_next());
+    pub fn get_values(&self) -> URLSearchParamsValuesIterator {
+        let iterator = unsafe { ffi::ada_search_params_get_values(self.0) };
+        URLSearchParamsValuesIterator::new(iterator)
+    }
+}
+
+pub struct URLSearchParamsKeysIterator<'a> {
+    iterator: *mut ffi::ada_url_search_params_keys_iter,
+    _phantom: core::marker::PhantomData<&'a str>,
+}
+
+impl<'a> Drop for URLSearchParamsKeysIterator<'a> {
+    fn drop(&mut self) {
+        unsafe { ffi::ada_free_search_params_keys_iter(self.iterator) }
+    }
+}
+
+impl<'a> URLSearchParamsKeysIterator<'a> {
+    /// Returns true if iterator has a next value.
+    pub fn has_next(&self) -> bool {
+        unsafe { ffi::ada_search_params_keys_iter_has_next(self.iterator) }
+    }
+
+    /// Returns a new value if it's available
+    pub fn get_next(&self) -> Option<&str> {
+        if self.has_next() {
+            return None;
+        }
+        let string = unsafe { ffi::ada_search_params_keys_iter_next(self.iterator) };
+        Some(string.as_str())
+    }
+}
+
+pub struct URLSearchParamsValuesIterator<'a> {
+    iterator: *mut ffi::ada_url_search_params_values_iter,
+    _phantom: core::marker::PhantomData<&'a str>,
+}
+
+impl<'a> URLSearchParamsKeysIterator<'a> {
+    fn new(iterator: *mut ffi::ada_url_search_params_keys_iter) -> URLSearchParamsKeysIterator<'a> {
+        URLSearchParamsKeysIterator {
+            iterator,
+            _phantom: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a> Drop for URLSearchParamsValuesIterator<'a> {
+    fn drop(&mut self) {
+        unsafe { ffi::ada_free_search_params_values_iter(self.iterator) }
+    }
+}
+
+impl<'a> URLSearchParamsValuesIterator<'a> {
+    fn new(
+        iterator: *mut ffi::ada_url_search_params_values_iter,
+    ) -> URLSearchParamsValuesIterator<'a> {
+        URLSearchParamsValuesIterator {
+            iterator,
+            _phantom: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a> URLSearchParamsValuesIterator<'a> {
+    /// Returns true if iterator has a next value.
+    pub fn has_next(&self) -> bool {
+        unsafe { ffi::ada_search_params_values_iter_has_next(self.iterator) }
+    }
+
+    /// Returns a new value if it's available
+    pub fn get_next(&self) -> Option<&str> {
+        if self.has_next() {
+            return None;
+        }
+        let string = unsafe { ffi::ada_search_params_values_iter_next(self.iterator) };
+        Some(string.as_str())
+    }
+}
+
+pub struct URLSearchParamsEntry<'a> {
+    strings: *mut ffi::ada_strings,
+    size: usize,
+    _phantom: core::marker::PhantomData<&'a str>,
+}
+
+impl<'a> URLSearchParamsEntry<'a> {
+    fn new(strings: *mut ffi::ada_strings, size: usize) -> URLSearchParamsEntry<'a> {
+        URLSearchParamsEntry {
+            strings,
+            size,
+            _phantom: core::marker::PhantomData,
+        }
+    }
+
+    /// Returns whether the key value pair is empty or not
+    ///
+    /// ```
+    /// use ada_url::URLSearchParams;
+    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let pairs = params.get_all("a");
+    /// assert_eq!(pairs.is_empty(), false);
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
+    }
+
+    /// Returns the size of the key value pairs
+    ///
+    /// ```
+    /// use ada_url::URLSearchParams;
+    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let pairs = params.get_all("a");
+    /// assert_eq!(pairs.get_size(), 1);
+    /// ```
+    pub fn get_size(&self) -> usize {
+        self.size
+    }
+
+    /// Get an entry by index
+    ///
+    /// ```
+    /// use ada_url::URLSearchParams;
+    /// let params = URLSearchParams::parse("a=1&a=2");
+    /// let pairs = params.get_all("a");
+    /// assert_eq!(pairs.get_size(), 2);
+    /// assert_eq!(pairs.get(0), Some("1"));
+    /// assert_eq!(pairs.get(1), Some("2"));
+    /// assert_eq!(pairs.get(2), None);
+    /// assert_eq!(pairs.get(55), None);
+    /// ```
+    pub fn get(&self, index: usize) -> Option<&str> {
+        if self.size == 0 || index > self.size - 1 {
+            return None;
+        }
+
+        unsafe {
+            let string = ffi::ada_strings_get(self.strings, index);
+            let slice = core::slice::from_raw_parts(string.data.cast(), string.length);
+            Some(core::str::from_utf8_unchecked(slice))
+        }
+    }
+}
+
+impl<'a> Drop for URLSearchParamsEntry<'a> {
+    /// Automatically frees the underlying C pointer.
+    fn drop(&mut self) {
+        unsafe { ffi::ada_free_strings(self.strings) }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<'a> From<URLSearchParamsEntry<'a>> for Vec<&'a str> {
+    fn from(val: URLSearchParamsEntry<'a>) -> Self {
+        let mut vec = Vec::with_capacity(val.size);
+        unsafe {
+            for index in 0..val.size {
+                let string = ffi::ada_strings_get(val.strings, index);
+                let slice = core::slice::from_raw_parts(string.data.cast(), string.length);
+                vec.push(core::str::from_utf8_unchecked(slice));
+            }
+        }
+        vec
     }
 }
