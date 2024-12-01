@@ -46,7 +46,10 @@ pub mod ffi;
 mod idna;
 mod url_search_params;
 pub use idna::Idna;
-pub use url_search_params::URLSearchParams;
+pub use url_search_params::{
+    URLSearchParams, URLSearchParamsEntry, URLSearchParamsKeysIterator,
+    URLSearchParamsValuesIterator,
+};
 
 #[cfg(feature = "std")]
 extern crate std;
