@@ -280,14 +280,22 @@ impl Drop for URLSearchParamsKeysIterator<'_> {
     }
 }
 
-impl URLSearchParamsKeysIterator<'_> {
+impl<'a> Iterator for URLSearchParamsKeysIterator<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.get_next()
+    }
+}
+
+impl<'a> URLSearchParamsKeysIterator<'a> {
     /// Returns true if iterator has a next value.
     pub fn has_next(&self) -> bool {
         unsafe { ffi::ada_search_params_keys_iter_has_next(self.iterator) }
     }
 
     /// Returns a new value if it's available
-    pub fn get_next(&mut self) -> Option<&str> {
+    pub fn get_next(&mut self) -> Option<&'a str> {
         if self.has_next() {
             return None;
         }
@@ -316,6 +324,14 @@ impl Drop for URLSearchParamsValuesIterator<'_> {
     }
 }
 
+impl<'a> Iterator for URLSearchParamsValuesIterator<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.get_next()
+    }
+}
+
 impl<'a> URLSearchParamsValuesIterator<'a> {
     fn new(
         iterator: *mut ffi::ada_url_search_params_values_iter,
@@ -327,14 +343,14 @@ impl<'a> URLSearchParamsValuesIterator<'a> {
     }
 }
 
-impl URLSearchParamsValuesIterator<'_> {
+impl<'a> URLSearchParamsValuesIterator<'a> {
     /// Returns true if iterator has a next value.
     pub fn has_next(&self) -> bool {
         unsafe { ffi::ada_search_params_values_iter_has_next(self.iterator) }
     }
 
     /// Returns a new value if it's available
-    pub fn get_next(&mut self) -> Option<&str> {
+    pub fn get_next(&mut self) -> Option<&'a str> {
         if self.has_next() {
             return None;
         }
