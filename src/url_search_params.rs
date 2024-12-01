@@ -135,8 +135,7 @@ impl URLSearchParams {
             if out.data.is_null() {
                 return None;
             }
-            let slice = core::slice::from_raw_parts(out.data.cast(), out.length);
-            Some(core::str::from_utf8_unchecked(slice))
+            Some(out.as_str())
         }
     }
 
@@ -165,7 +164,6 @@ impl URLSearchParams {
         unsafe {
             let strings = ffi::ada_search_params_get_all(self.0, key.as_ptr().cast(), key.len());
             let size = ffi::ada_strings_size(strings);
-
             URLSearchParamsEntry::new(strings, size)
         }
     }
@@ -200,13 +198,13 @@ pub struct URLSearchParamsKeysIterator<'a> {
     _phantom: core::marker::PhantomData<&'a str>,
 }
 
-impl<'a> Drop for URLSearchParamsKeysIterator<'a> {
+impl Drop for URLSearchParamsKeysIterator<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params_keys_iter(self.iterator) }
     }
 }
 
-impl<'a> URLSearchParamsKeysIterator<'a> {
+impl URLSearchParamsKeysIterator<'_> {
     /// Returns true if iterator has a next value.
     pub fn has_next(&self) -> bool {
         unsafe { ffi::ada_search_params_keys_iter_has_next(self.iterator) }
@@ -236,7 +234,7 @@ impl<'a> URLSearchParamsKeysIterator<'a> {
     }
 }
 
-impl<'a> Drop for URLSearchParamsValuesIterator<'a> {
+impl Drop for URLSearchParamsValuesIterator<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params_values_iter(self.iterator) }
     }
@@ -253,7 +251,7 @@ impl<'a> URLSearchParamsValuesIterator<'a> {
     }
 }
 
-impl<'a> URLSearchParamsValuesIterator<'a> {
+impl URLSearchParamsValuesIterator<'_> {
     /// Returns true if iterator has a next value.
     pub fn has_next(&self) -> bool {
         unsafe { ffi::ada_search_params_values_iter_has_next(self.iterator) }
@@ -327,14 +325,12 @@ impl<'a> URLSearchParamsEntry<'a> {
 
         unsafe {
             let string = ffi::ada_strings_get(self.strings, index);
-            let slice = core::slice::from_raw_parts(string.data.cast(), string.length);
-            Some(core::str::from_utf8_unchecked(slice))
+            Some(string.as_str())
         }
     }
 }
 
-impl<'a> Drop for URLSearchParamsEntry<'a> {
-    /// Automatically frees the underlying C pointer.
+impl Drop for URLSearchParamsEntry<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_strings(self.strings) }
     }
