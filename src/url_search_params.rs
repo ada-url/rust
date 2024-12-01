@@ -1,4 +1,4 @@
-use crate::ffi;
+use crate::{ffi, ParseUrlError};
 
 pub struct URLSearchParams(*mut ffi::ada_url_search_params);
 
@@ -13,19 +13,26 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// assert_eq!(params.get("a"), Some("1"));
     /// assert_eq!(params.get("b"), Some("2"));
     /// ```
-    pub fn parse(input: &str) -> Self {
-        Self(unsafe { ffi::ada_parse_search_params(input.as_ptr().cast(), input.len()) })
+    pub fn parse<Input>(input: Input) -> Result<Self, ParseUrlError<Input>>
+    where
+        Input: AsRef<str>,
+    {
+        Ok(Self(unsafe {
+            ffi::ada_parse_search_params(input.as_ref().as_ptr().cast(), input.as_ref().len())
+        }))
     }
 
     /// Returns the size of the URLSearchParams struct.
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// assert_eq!(params.len(), 2);
     /// ```
     pub fn len(&self) -> usize {
@@ -60,7 +67,8 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let mut params = URLSearchParams::parse("a=1&b=2");
+    /// let mut params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// params.set("a", "3");
     /// assert_eq!(params.get("a"), Some("3"));
     /// ```
@@ -82,7 +90,8 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let mut params = URLSearchParams::parse("a=1&b=2");
+    /// let mut params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// params.remove("a", Some("1"));
     /// assert_eq!(params.get("a"), None);
     /// ```
@@ -106,7 +115,8 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// assert_eq!(params.contains("a", None), true);
     /// ```
     pub fn contains(&self, key: &str, value: Option<&str>) -> bool {
@@ -129,7 +139,8 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// assert_eq!(params.get("a"), Some("1"));
     /// assert_eq!(params.get("c"), None);
     /// ```
@@ -144,24 +155,12 @@ impl URLSearchParams {
         }
     }
 
-    /// Returns the stringified version of the URLSearchParams struct.
-    ///
-    /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
-    /// assert_eq!(params.to_string(), "a=1&b=2");
-    /// ```
-    #[cfg(feature = "std")]
-    #[allow(clippy::inherent_to_string)]
-    pub fn to_string(&self) -> String {
-        unsafe { ffi::ada_search_params_to_string(self.0).to_string() }
-    }
-
     /// Returns all values of the key.
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&a=2");
+    /// let params = URLSearchParams::parse("a=1&a=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.len(), 2);
     /// ```
@@ -177,7 +176,8 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1");
+    /// let params = URLSearchParams::parse("a=1")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let mut keys = params.keys();
     /// assert!(keys.has_next());
     pub fn keys(&self) -> URLSearchParamsKeysIterator {
@@ -189,12 +189,38 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1");
+    /// let params = URLSearchParams::parse("a=1")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let mut values = params.values();
     /// assert!(values.has_next());
     pub fn values(&self) -> URLSearchParamsValuesIterator {
         let iterator = unsafe { ffi::ada_search_params_get_values(self.0) };
         URLSearchParamsValuesIterator::new(iterator)
+    }
+}
+
+#[cfg(feature = "std")]
+impl core::str::FromStr for URLSearchParams {
+    type Err = ParseUrlError<Box<str>>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s).map_err(|ParseUrlError { input }| ParseUrlError {
+            input: input.into(),
+        })
+    }
+}
+
+/// Returns the stringified version of the URLSearchParams struct.
+///
+/// ```
+/// use ada_url::URLSearchParams;
+/// let params = URLSearchParams::parse("a=1&b=2")
+///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+/// assert_eq!(params.to_string(), "a=1&b=2");
+/// ```
+impl core::fmt::Display for URLSearchParams {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(unsafe { ffi::ada_search_params_to_string(self.0).as_ref() })
     }
 }
 
@@ -291,7 +317,8 @@ impl<'a> URLSearchParamsEntry<'a> {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.is_empty(), false);
     /// ```
@@ -303,7 +330,8 @@ impl<'a> URLSearchParamsEntry<'a> {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.len(), 1);
     /// ```
@@ -315,7 +343,8 @@ impl<'a> URLSearchParamsEntry<'a> {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&a=2");
+    /// let params = URLSearchParams::parse("a=1&a=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.len(), 2);
     /// assert_eq!(pairs.get(0), Some("1"));
