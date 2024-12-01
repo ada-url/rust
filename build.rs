@@ -130,8 +130,8 @@ fn main() {
             let major = ndk_major_version(Path::new(&ndk));
             if major < 22 {
                 build
-                    .flag(&format!("--sysroot={}/sysroot", ndk))
-                    .flag(&format!(
+                    .flag(format!("--sysroot={}/sysroot", ndk))
+                    .flag(format!(
                         "-isystem{}/sources/cxx-stl/llvm-libc++/include",
                         ndk
                     ));
@@ -139,7 +139,7 @@ fn main() {
                 // NDK versions >= 22 have the sysroot in the llvm prebuilt by
                 let host_toolchain = format!("{}/toolchains/llvm/prebuilt/{}", ndk, host_tag());
                 // sysroot is stored in the prebuilt llvm, under the host
-                build.flag(&format!("--sysroot={}/sysroot", host_toolchain));
+                build.flag(format!("--sysroot={}/sysroot", host_toolchain));
             }
         }
         _ => {
