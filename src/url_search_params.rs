@@ -246,6 +246,29 @@ where
     }
 }
 
+#[cfg(feature = "std")]
+impl<Input> FromIterator<(Input, Input)> for URLSearchParams
+where
+    Input: AsRef<str>,
+{
+    /// Converts an iterator to URLSearchParams
+    ///
+    /// ```
+    /// use ada_url::URLSearchParams;
+    /// let iterator = std::iter::repeat(("hello", "world")).take(5);
+    /// let params = URLSearchParams::from_iter(iterator);
+    /// assert_eq!(params.len(), 5);
+    /// ```
+    fn from_iter<T: IntoIterator<Item = (Input, Input)>>(iter: T) -> Self {
+        let mut params = URLSearchParams::parse("")
+            .expect("Failed to parse empty string. This is likely due to a bug");
+        for item in iter {
+            params.append(item.0.as_ref(), item.1.as_ref());
+        }
+        params
+    }
+}
+
 pub struct URLSearchParamsKeysIterator<'a> {
     iterator: *mut ffi::ada_url_search_params_keys_iter,
     _phantom: core::marker::PhantomData<&'a str>,
