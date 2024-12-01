@@ -224,6 +224,28 @@ impl core::fmt::Display for URLSearchParams {
     }
 }
 
+#[cfg(feature = "std")]
+impl<Input> Extend<(Input, Input)> for URLSearchParams
+where
+    Input: AsRef<str>,
+{
+    /// Supports extending URLSearchParams through an iterator.
+    ///
+    ///```
+    /// use ada_url::URLSearchParams;
+    /// let mut params = URLSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// assert_eq!(params.len(), 2);
+    /// params.extend([("foo", "bar")]);
+    /// assert_eq!(params.len(), 3);
+    /// ```
+    fn extend<T: IntoIterator<Item = (Input, Input)>>(&mut self, iter: T) {
+        for item in iter {
+            self.append(item.0.as_ref(), item.1.as_ref());
+        }
+    }
+}
+
 pub struct URLSearchParamsKeysIterator<'a> {
     iterator: *mut ffi::ada_url_search_params_keys_iter,
     _phantom: core::marker::PhantomData<&'a str>,
