@@ -179,10 +179,10 @@ impl URLSearchParams {
     /// let params = URLSearchParams::parse("a=1")
     ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let mut keys = params.keys();
-    /// assert!(keys.has_next());
-    pub fn keys(&self) -> URLSearchParamsKeysIterator {
+    /// assert!(keys.next().is_some());
+    pub fn keys(&self) -> URLSearchParamsKeyIterator {
         let iterator = unsafe { ffi::ada_search_params_get_keys(self.0) };
-        URLSearchParamsKeysIterator::new(iterator)
+        URLSearchParamsKeyIterator::new(iterator)
     }
 
     /// Returns all keys as an iterator
@@ -192,10 +192,24 @@ impl URLSearchParams {
     /// let params = URLSearchParams::parse("a=1")
     ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
     /// let mut values = params.values();
-    /// assert!(values.has_next());
-    pub fn values(&self) -> URLSearchParamsValuesIterator {
+    /// assert!(values.next().is_some());
+    pub fn values(&self) -> URLSearchParamsValueIterator {
         let iterator = unsafe { ffi::ada_search_params_get_values(self.0) };
-        URLSearchParamsValuesIterator::new(iterator)
+        URLSearchParamsValueIterator::new(iterator)
+    }
+
+    /// Returns all entries as an iterator
+    ///
+    /// ```
+    /// use ada_url::URLSearchParams;
+    /// let params = URLSearchParams::parse("a=1")
+    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// let mut entries = params.entries();
+    /// assert_eq!(entries.next(), Some(("a", "1")));
+    /// ```
+    pub fn entries(&self) -> URLSearchParamsEntryIterator {
+        let iterator = unsafe { ffi::ada_search_params_get_entries(self.0) };
+        URLSearchParamsEntryIterator::new(iterator)
     }
 }
 
@@ -269,93 +283,73 @@ where
     }
 }
 
-pub struct URLSearchParamsKeysIterator<'a> {
+pub struct URLSearchParamsKeyIterator<'a> {
     iterator: *mut ffi::ada_url_search_params_keys_iter,
     _phantom: core::marker::PhantomData<&'a str>,
 }
 
-impl Drop for URLSearchParamsKeysIterator<'_> {
+impl Drop for URLSearchParamsKeyIterator<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params_keys_iter(self.iterator) }
     }
 }
 
-impl<'a> Iterator for URLSearchParamsKeysIterator<'a> {
+impl<'a> Iterator for URLSearchParamsKeyIterator<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.get_next()
-    }
-}
-
-impl<'a> URLSearchParamsKeysIterator<'a> {
-    /// Returns true if iterator has a next value.
-    pub fn has_next(&self) -> bool {
-        unsafe { ffi::ada_search_params_keys_iter_has_next(self.iterator) }
-    }
-
-    /// Returns a new value if it's available
-    pub fn get_next(&mut self) -> Option<&'a str> {
-        if self.has_next() {
-            return None;
+        let has_next = unsafe { ffi::ada_search_params_keys_iter_has_next(self.iterator) };
+        if has_next {
+            let string = unsafe { ffi::ada_search_params_keys_iter_next(self.iterator) };
+            Some(string.as_str())
+        } else {
+            None
         }
-        let string = unsafe { ffi::ada_search_params_keys_iter_next(self.iterator) };
-        Some(string.as_str())
     }
 }
 
-pub struct URLSearchParamsValuesIterator<'a> {
+pub struct URLSearchParamsValueIterator<'a> {
     iterator: *mut ffi::ada_url_search_params_values_iter,
     _phantom: core::marker::PhantomData<&'a str>,
 }
 
-impl<'a> URLSearchParamsKeysIterator<'a> {
-    fn new(iterator: *mut ffi::ada_url_search_params_keys_iter) -> URLSearchParamsKeysIterator<'a> {
-        URLSearchParamsKeysIterator {
+impl<'a> URLSearchParamsKeyIterator<'a> {
+    fn new(iterator: *mut ffi::ada_url_search_params_keys_iter) -> URLSearchParamsKeyIterator<'a> {
+        URLSearchParamsKeyIterator {
             iterator,
             _phantom: core::marker::PhantomData,
         }
     }
 }
 
-impl Drop for URLSearchParamsValuesIterator<'_> {
+impl Drop for URLSearchParamsValueIterator<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params_values_iter(self.iterator) }
     }
 }
 
-impl<'a> Iterator for URLSearchParamsValuesIterator<'a> {
+impl<'a> Iterator for URLSearchParamsValueIterator<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.get_next()
+        let has_next = unsafe { ffi::ada_search_params_values_iter_has_next(self.iterator) };
+        if has_next {
+            let string = unsafe { ffi::ada_search_params_values_iter_next(self.iterator) };
+            Some(string.as_str())
+        } else {
+            None
+        }
     }
 }
 
-impl<'a> URLSearchParamsValuesIterator<'a> {
+impl<'a> URLSearchParamsValueIterator<'a> {
     fn new(
         iterator: *mut ffi::ada_url_search_params_values_iter,
-    ) -> URLSearchParamsValuesIterator<'a> {
-        URLSearchParamsValuesIterator {
+    ) -> URLSearchParamsValueIterator<'a> {
+        URLSearchParamsValueIterator {
             iterator,
             _phantom: core::marker::PhantomData,
         }
-    }
-}
-
-impl<'a> URLSearchParamsValuesIterator<'a> {
-    /// Returns true if iterator has a next value.
-    pub fn has_next(&self) -> bool {
-        unsafe { ffi::ada_search_params_values_iter_has_next(self.iterator) }
-    }
-
-    /// Returns a new value if it's available
-    pub fn get_next(&mut self) -> Option<&'a str> {
-        if self.has_next() {
-            return None;
-        }
-        let string = unsafe { ffi::ada_search_params_values_iter_next(self.iterator) };
-        Some(string.as_str())
     }
 }
 
@@ -443,5 +437,41 @@ impl<'a> From<URLSearchParamsEntry<'a>> for Vec<&'a str> {
             }
         }
         vec
+    }
+}
+
+pub struct URLSearchParamsEntryIterator<'a> {
+    iterator: *mut ffi::ada_url_search_params_entries_iter,
+    _phantom: core::marker::PhantomData<&'a str>,
+}
+
+impl<'a> URLSearchParamsEntryIterator<'a> {
+    fn new(
+        iterator: *mut ffi::ada_url_search_params_entries_iter,
+    ) -> URLSearchParamsEntryIterator<'a> {
+        URLSearchParamsEntryIterator {
+            iterator,
+            _phantom: core::marker::PhantomData,
+        }
+    }
+}
+
+impl Drop for URLSearchParamsEntryIterator<'_> {
+    fn drop(&mut self) {
+        unsafe { ffi::ada_free_search_params_entries_iter(self.iterator) }
+    }
+}
+
+impl<'a> Iterator for URLSearchParamsEntryIterator<'a> {
+    type Item = (&'a str, &'a str);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let has_next = unsafe { ffi::ada_search_params_entries_iter_has_next(self.iterator) };
+        if has_next {
+            let pair = unsafe { ffi::ada_search_params_entries_iter_next(self.iterator) };
+            Some((pair.key.as_str(), pair.value.as_str()))
+        } else {
+            None
+        }
     }
 }
