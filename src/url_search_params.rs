@@ -26,19 +26,24 @@ impl URLSearchParams {
     /// ```
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1&b=2");
-    /// assert_eq!(params.size(), 2);
+    /// assert_eq!(params.len(), 2);
     /// ```
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         unsafe { ffi::ada_search_params_size(self.0) }
     }
 
+    /// Returns true if no entries exist in the URLSearchParams.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Sorts the keys of the URLSearchParams struct.
-    pub fn sort(&self) {
+    pub fn sort(&mut self) {
         unsafe { ffi::ada_search_params_sort(self.0) }
     }
 
     /// Appends a key/value to the URLSearchParams struct.
-    pub fn append(&self, key: &str, value: &str) {
+    pub fn append(&mut self, key: &str, value: &str) {
         unsafe {
             ffi::ada_search_params_append(
                 self.0,
@@ -50,16 +55,16 @@ impl URLSearchParams {
         }
     }
 
-    /// Removes all keys pre-existing keys from the URLSearchParams struct
+    /// Removes all pre-existing keys from the URLSearchParams struct
     /// and appends the new key/value.
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let mut params = URLSearchParams::parse("a=1&b=2");
     /// params.set("a", "3");
     /// assert_eq!(params.get("a"), Some("3"));
     /// ```
-    pub fn set(&self, key: &str, value: &str) {
+    pub fn set(&mut self, key: &str, value: &str) {
         unsafe {
             ffi::ada_search_params_set(
                 self.0,
@@ -77,11 +82,11 @@ impl URLSearchParams {
     ///
     /// ```
     /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2");
+    /// let mut params = URLSearchParams::parse("a=1&b=2");
     /// params.remove("a", Some("1"));
     /// assert_eq!(params.get("a"), None);
     /// ```
-    pub fn remove(&self, key: &str, value: Option<&str>) {
+    pub fn remove(&mut self, key: &str, value: Option<&str>) {
         if let Some(value) = value {
             unsafe {
                 ffi::ada_search_params_remove_value(
@@ -97,14 +102,14 @@ impl URLSearchParams {
         }
     }
 
-    /// Retruns true if the URLSearchParams struct contains the key.
+    /// Returns whether the [`URLSearchParams`] contains the `key`.
     ///
     /// ```
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1&b=2");
-    /// assert_eq!(params.has("a", None), true);
+    /// assert_eq!(params.contains("a", None), true);
     /// ```
-    pub fn has(&self, key: &str, value: Option<&str>) -> bool {
+    pub fn contains(&self, key: &str, value: Option<&str>) -> bool {
         if let Some(value) = value {
             unsafe {
                 ffi::ada_search_params_has_value(
@@ -158,7 +163,7 @@ impl URLSearchParams {
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1&a=2");
     /// let pairs = params.get_all("a");
-    /// assert_eq!(pairs.get_size(), 2);
+    /// assert_eq!(pairs.len(), 2);
     /// ```
     pub fn get_all(&self, key: &str) -> URLSearchParamsEntry {
         unsafe {
@@ -173,9 +178,9 @@ impl URLSearchParams {
     /// ```
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1");
-    /// let mut keys = params.get_keys();
+    /// let mut keys = params.keys();
     /// assert!(keys.has_next());
-    pub fn get_keys(&self) -> URLSearchParamsKeysIterator {
+    pub fn keys(&self) -> URLSearchParamsKeysIterator {
         let iterator = unsafe { ffi::ada_search_params_get_keys(self.0) };
         URLSearchParamsKeysIterator::new(iterator)
     }
@@ -185,9 +190,9 @@ impl URLSearchParams {
     /// ```
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1");
-    /// let mut values = params.get_values();
+    /// let mut values = params.values();
     /// assert!(values.has_next());
-    pub fn get_values(&self) -> URLSearchParamsValuesIterator {
+    pub fn values(&self) -> URLSearchParamsValuesIterator {
         let iterator = unsafe { ffi::ada_search_params_get_values(self.0) };
         URLSearchParamsValuesIterator::new(iterator)
     }
@@ -211,7 +216,7 @@ impl URLSearchParamsKeysIterator<'_> {
     }
 
     /// Returns a new value if it's available
-    pub fn get_next(&self) -> Option<&str> {
+    pub fn get_next(&mut self) -> Option<&str> {
         if self.has_next() {
             return None;
         }
@@ -258,7 +263,7 @@ impl URLSearchParamsValuesIterator<'_> {
     }
 
     /// Returns a new value if it's available
-    pub fn get_next(&self) -> Option<&str> {
+    pub fn get_next(&mut self) -> Option<&str> {
         if self.has_next() {
             return None;
         }
@@ -300,9 +305,9 @@ impl<'a> URLSearchParamsEntry<'a> {
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1&b=2");
     /// let pairs = params.get_all("a");
-    /// assert_eq!(pairs.get_size(), 1);
+    /// assert_eq!(pairs.len(), 1);
     /// ```
-    pub fn get_size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.size
     }
 
@@ -312,7 +317,7 @@ impl<'a> URLSearchParamsEntry<'a> {
     /// use ada_url::URLSearchParams;
     /// let params = URLSearchParams::parse("a=1&a=2");
     /// let pairs = params.get_all("a");
-    /// assert_eq!(pairs.get_size(), 2);
+    /// assert_eq!(pairs.len(), 2);
     /// assert_eq!(pairs.get(0), Some("1"));
     /// assert_eq!(pairs.get(1), Some("2"));
     /// assert_eq!(pairs.get(2), None);
