@@ -285,7 +285,7 @@ extern "C" {
     pub fn ada_free_search_params_entries_iter(iter: *mut ada_url_search_params_entries_iter);
     pub fn ada_search_params_entries_iter_next(
         iter: *mut ada_url_search_params_entries_iter,
-    ) -> *mut ada_string_pair;
+    ) -> ada_string_pair;
     pub fn ada_search_params_entries_iter_has_next(
         iter: *mut ada_url_search_params_entries_iter,
     ) -> bool;
