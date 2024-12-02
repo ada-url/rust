@@ -1,20 +1,20 @@
 use crate::{ffi, ParseUrlError};
 
-pub struct URLSearchParams(*mut ffi::ada_url_search_params);
+pub struct UrlSearchParams(*mut ffi::ada_url_search_params);
 
-impl Drop for URLSearchParams {
+impl Drop for UrlSearchParams {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params(self.0) }
     }
 }
 
-impl URLSearchParams {
-    /// Parses an return a URLSearchParams struct.
+impl UrlSearchParams {
+    /// Parses an return a UrlSearchParams struct.
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// assert_eq!(params.get("a"), Some("1"));
     /// assert_eq!(params.get("b"), Some("2"));
     /// ```
@@ -27,29 +27,29 @@ impl URLSearchParams {
         }))
     }
 
-    /// Returns the size of the URLSearchParams struct.
+    /// Returns the size of the UrlSearchParams struct.
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// assert_eq!(params.len(), 2);
     /// ```
     pub fn len(&self) -> usize {
         unsafe { ffi::ada_search_params_size(self.0) }
     }
 
-    /// Returns true if no entries exist in the URLSearchParams.
+    /// Returns true if no entries exist in the UrlSearchParams.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// Sorts the keys of the URLSearchParams struct.
+    /// Sorts the keys of the UrlSearchParams struct.
     pub fn sort(&mut self) {
         unsafe { ffi::ada_search_params_sort(self.0) }
     }
 
-    /// Appends a key/value to the URLSearchParams struct.
+    /// Appends a key/value to the UrlSearchParams struct.
     pub fn append(&mut self, key: &str, value: &str) {
         unsafe {
             ffi::ada_search_params_append(
@@ -62,13 +62,13 @@ impl URLSearchParams {
         }
     }
 
-    /// Removes all pre-existing keys from the URLSearchParams struct
+    /// Removes all pre-existing keys from the UrlSearchParams struct
     /// and appends the new key/value.
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let mut params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let mut params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// params.set("a", "3");
     /// assert_eq!(params.get("a"), Some("3"));
     /// ```
@@ -84,14 +84,14 @@ impl URLSearchParams {
         }
     }
 
-    /// Removes a key/value from the URLSearchParams struct.
+    /// Removes a key/value from the UrlSearchParams struct.
     /// Depending on the value parameter, it will either remove
     /// the key/value pair or just the key.
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let mut params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let mut params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// params.remove("a", Some("1"));
     /// assert_eq!(params.get("a"), None);
     /// ```
@@ -111,12 +111,12 @@ impl URLSearchParams {
         }
     }
 
-    /// Returns whether the [`URLSearchParams`] contains the `key`.
+    /// Returns whether the [`UrlSearchParams`] contains the `key`.
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// assert_eq!(params.contains("a", None), true);
     /// ```
     pub fn contains(&self, key: &str, value: Option<&str>) -> bool {
@@ -138,9 +138,9 @@ impl URLSearchParams {
     /// Returns the value of the key.
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// assert_eq!(params.get("a"), Some("1"));
     /// assert_eq!(params.get("c"), None);
     /// ```
@@ -158,63 +158,63 @@ impl URLSearchParams {
     /// Returns all values of the key.
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&a=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&a=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.len(), 2);
     /// ```
-    pub fn get_all(&self, key: &str) -> URLSearchParamsEntry {
+    pub fn get_all(&self, key: &str) -> UrlSearchParamsEntry {
         unsafe {
             let strings = ffi::ada_search_params_get_all(self.0, key.as_ptr().cast(), key.len());
             let size = ffi::ada_strings_size(strings);
-            URLSearchParamsEntry::new(strings, size)
+            UrlSearchParamsEntry::new(strings, size)
         }
     }
 
     /// Returns all keys as an iterator
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// let mut keys = params.keys();
     /// assert!(keys.next().is_some());
-    pub fn keys(&self) -> URLSearchParamsKeyIterator {
+    pub fn keys(&self) -> UrlSearchParamsKeyIterator {
         let iterator = unsafe { ffi::ada_search_params_get_keys(self.0) };
-        URLSearchParamsKeyIterator::new(iterator)
+        UrlSearchParamsKeyIterator::new(iterator)
     }
 
     /// Returns all keys as an iterator
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// let mut values = params.values();
     /// assert!(values.next().is_some());
-    pub fn values(&self) -> URLSearchParamsValueIterator {
+    pub fn values(&self) -> UrlSearchParamsValueIterator {
         let iterator = unsafe { ffi::ada_search_params_get_values(self.0) };
-        URLSearchParamsValueIterator::new(iterator)
+        UrlSearchParamsValueIterator::new(iterator)
     }
 
     /// Returns all entries as an iterator
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// let mut entries = params.entries();
     /// assert_eq!(entries.next(), Some(("a", "1")));
     /// ```
-    pub fn entries(&self) -> URLSearchParamsEntryIterator {
+    pub fn entries(&self) -> UrlSearchParamsEntryIterator {
         let iterator = unsafe { ffi::ada_search_params_get_entries(self.0) };
-        URLSearchParamsEntryIterator::new(iterator)
+        UrlSearchParamsEntryIterator::new(iterator)
     }
 }
 
 #[cfg(feature = "std")]
-impl core::str::FromStr for URLSearchParams {
+impl core::str::FromStr for UrlSearchParams {
     type Err = ParseUrlError<Box<str>>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -224,31 +224,31 @@ impl core::str::FromStr for URLSearchParams {
     }
 }
 
-/// Returns the stringified version of the URLSearchParams struct.
+/// Returns the stringified version of the UrlSearchParams struct.
 ///
 /// ```
-/// use ada_url::URLSearchParams;
-/// let params = URLSearchParams::parse("a=1&b=2")
-///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+/// use ada_url::UrlSearchParams;
+/// let params = UrlSearchParams::parse("a=1&b=2")
+///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
 /// assert_eq!(params.to_string(), "a=1&b=2");
 /// ```
-impl core::fmt::Display for URLSearchParams {
+impl core::fmt::Display for UrlSearchParams {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(unsafe { ffi::ada_search_params_to_string(self.0).as_ref() })
     }
 }
 
 #[cfg(feature = "std")]
-impl<Input> Extend<(Input, Input)> for URLSearchParams
+impl<Input> Extend<(Input, Input)> for UrlSearchParams
 where
     Input: AsRef<str>,
 {
-    /// Supports extending URLSearchParams through an iterator.
+    /// Supports extending UrlSearchParams through an iterator.
     ///
     ///```
-    /// use ada_url::URLSearchParams;
-    /// let mut params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let mut params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// assert_eq!(params.len(), 2);
     /// params.extend([("foo", "bar")]);
     /// assert_eq!(params.len(), 3);
@@ -261,20 +261,20 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<Input> FromIterator<(Input, Input)> for URLSearchParams
+impl<Input> FromIterator<(Input, Input)> for UrlSearchParams
 where
     Input: AsRef<str>,
 {
-    /// Converts an iterator to URLSearchParams
+    /// Converts an iterator to UrlSearchParams
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
+    /// use ada_url::UrlSearchParams;
     /// let iterator = std::iter::repeat(("hello", "world")).take(5);
-    /// let params = URLSearchParams::from_iter(iterator);
+    /// let params = UrlSearchParams::from_iter(iterator);
     /// assert_eq!(params.len(), 5);
     /// ```
     fn from_iter<T: IntoIterator<Item = (Input, Input)>>(iter: T) -> Self {
-        let mut params = URLSearchParams::parse("")
+        let mut params = UrlSearchParams::parse("")
             .expect("Failed to parse empty string. This is likely due to a bug");
         for item in iter {
             params.append(item.0.as_ref(), item.1.as_ref());
@@ -283,18 +283,18 @@ where
     }
 }
 
-pub struct URLSearchParamsKeyIterator<'a> {
+pub struct UrlSearchParamsKeyIterator<'a> {
     iterator: *mut ffi::ada_url_search_params_keys_iter,
     _phantom: core::marker::PhantomData<&'a str>,
 }
 
-impl Drop for URLSearchParamsKeyIterator<'_> {
+impl Drop for UrlSearchParamsKeyIterator<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params_keys_iter(self.iterator) }
     }
 }
 
-impl<'a> Iterator for URLSearchParamsKeyIterator<'a> {
+impl<'a> Iterator for UrlSearchParamsKeyIterator<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -308,27 +308,27 @@ impl<'a> Iterator for URLSearchParamsKeyIterator<'a> {
     }
 }
 
-pub struct URLSearchParamsValueIterator<'a> {
+pub struct UrlSearchParamsValueIterator<'a> {
     iterator: *mut ffi::ada_url_search_params_values_iter,
     _phantom: core::marker::PhantomData<&'a str>,
 }
 
-impl<'a> URLSearchParamsKeyIterator<'a> {
-    fn new(iterator: *mut ffi::ada_url_search_params_keys_iter) -> URLSearchParamsKeyIterator<'a> {
-        URLSearchParamsKeyIterator {
+impl<'a> UrlSearchParamsKeyIterator<'a> {
+    fn new(iterator: *mut ffi::ada_url_search_params_keys_iter) -> UrlSearchParamsKeyIterator<'a> {
+        UrlSearchParamsKeyIterator {
             iterator,
             _phantom: core::marker::PhantomData,
         }
     }
 }
 
-impl Drop for URLSearchParamsValueIterator<'_> {
+impl Drop for UrlSearchParamsValueIterator<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params_values_iter(self.iterator) }
     }
 }
 
-impl<'a> Iterator for URLSearchParamsValueIterator<'a> {
+impl<'a> Iterator for UrlSearchParamsValueIterator<'a> {
     type Item = &'a str;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -342,26 +342,26 @@ impl<'a> Iterator for URLSearchParamsValueIterator<'a> {
     }
 }
 
-impl<'a> URLSearchParamsValueIterator<'a> {
+impl<'a> UrlSearchParamsValueIterator<'a> {
     fn new(
         iterator: *mut ffi::ada_url_search_params_values_iter,
-    ) -> URLSearchParamsValueIterator<'a> {
-        URLSearchParamsValueIterator {
+    ) -> UrlSearchParamsValueIterator<'a> {
+        UrlSearchParamsValueIterator {
             iterator,
             _phantom: core::marker::PhantomData,
         }
     }
 }
 
-pub struct URLSearchParamsEntry<'a> {
+pub struct UrlSearchParamsEntry<'a> {
     strings: *mut ffi::ada_strings,
     size: usize,
     _phantom: core::marker::PhantomData<&'a str>,
 }
 
-impl<'a> URLSearchParamsEntry<'a> {
-    fn new(strings: *mut ffi::ada_strings, size: usize) -> URLSearchParamsEntry<'a> {
-        URLSearchParamsEntry {
+impl<'a> UrlSearchParamsEntry<'a> {
+    fn new(strings: *mut ffi::ada_strings, size: usize) -> UrlSearchParamsEntry<'a> {
+        UrlSearchParamsEntry {
             strings,
             size,
             _phantom: core::marker::PhantomData,
@@ -371,9 +371,9 @@ impl<'a> URLSearchParamsEntry<'a> {
     /// Returns whether the key value pair is empty or not
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.is_empty(), false);
     /// ```
@@ -384,9 +384,9 @@ impl<'a> URLSearchParamsEntry<'a> {
     /// Returns the size of the key value pairs
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&b=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&b=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.len(), 1);
     /// ```
@@ -397,9 +397,9 @@ impl<'a> URLSearchParamsEntry<'a> {
     /// Get an entry by index
     ///
     /// ```
-    /// use ada_url::URLSearchParams;
-    /// let params = URLSearchParams::parse("a=1&a=2")
-    ///     .expect("This is a valid URLSearchParams. Should have parsed it.");
+    /// use ada_url::UrlSearchParams;
+    /// let params = UrlSearchParams::parse("a=1&a=2")
+    ///     .expect("This is a valid UrlSearchParams. Should have parsed it.");
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.len(), 2);
     /// assert_eq!(pairs.get(0), Some("1"));
@@ -419,15 +419,15 @@ impl<'a> URLSearchParamsEntry<'a> {
     }
 }
 
-impl Drop for URLSearchParamsEntry<'_> {
+impl Drop for UrlSearchParamsEntry<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_strings(self.strings) }
     }
 }
 
 #[cfg(feature = "std")]
-impl<'a> From<URLSearchParamsEntry<'a>> for Vec<&'a str> {
-    fn from(val: URLSearchParamsEntry<'a>) -> Self {
+impl<'a> From<UrlSearchParamsEntry<'a>> for Vec<&'a str> {
+    fn from(val: UrlSearchParamsEntry<'a>) -> Self {
         let mut vec = Vec::with_capacity(val.size);
         unsafe {
             for index in 0..val.size {
@@ -440,29 +440,29 @@ impl<'a> From<URLSearchParamsEntry<'a>> for Vec<&'a str> {
     }
 }
 
-pub struct URLSearchParamsEntryIterator<'a> {
+pub struct UrlSearchParamsEntryIterator<'a> {
     iterator: *mut ffi::ada_url_search_params_entries_iter,
     _phantom: core::marker::PhantomData<&'a str>,
 }
 
-impl<'a> URLSearchParamsEntryIterator<'a> {
+impl<'a> UrlSearchParamsEntryIterator<'a> {
     fn new(
         iterator: *mut ffi::ada_url_search_params_entries_iter,
-    ) -> URLSearchParamsEntryIterator<'a> {
-        URLSearchParamsEntryIterator {
+    ) -> UrlSearchParamsEntryIterator<'a> {
+        UrlSearchParamsEntryIterator {
             iterator,
             _phantom: core::marker::PhantomData,
         }
     }
 }
 
-impl Drop for URLSearchParamsEntryIterator<'_> {
+impl Drop for UrlSearchParamsEntryIterator<'_> {
     fn drop(&mut self) {
         unsafe { ffi::ada_free_search_params_entries_iter(self.iterator) }
     }
 }
 
-impl<'a> Iterator for URLSearchParamsEntryIterator<'a> {
+impl<'a> Iterator for UrlSearchParamsEntryIterator<'a> {
     type Item = (&'a str, &'a str);
 
     fn next(&mut self) -> Option<Self::Item> {
