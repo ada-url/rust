@@ -47,8 +47,8 @@ mod idna;
 mod url_search_params;
 pub use idna::Idna;
 pub use url_search_params::{
-    URLSearchParams, URLSearchParamsEntry, URLSearchParamsEntryIterator,
-    URLSearchParamsKeyIterator, URLSearchParamsValueIterator,
+    UrlSearchParams, UrlSearchParamsEntry, UrlSearchParamsEntryIterator,
+    UrlSearchParamsKeyIterator, UrlSearchParamsValueIterator,
 };
 
 #[cfg(feature = "std")]
