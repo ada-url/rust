@@ -213,6 +213,12 @@ impl UrlSearchParams {
     }
 }
 
+impl core::hash::Hash for UrlSearchParams {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
 #[cfg(feature = "std")]
 impl core::str::FromStr for UrlSearchParams {
     type Err = ParseUrlError<Box<str>>;
