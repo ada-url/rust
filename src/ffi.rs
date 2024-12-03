@@ -22,6 +22,12 @@ pub struct ada_string {
 impl ada_string {
     #[must_use]
     pub const fn as_str(&self) -> &'static str {
+        // We need to handle length 0 since data will be `nullptr`
+        // Not handling will result in a panic due to core::slice::from_raw_parts
+        // implementation
+        if self.length == 0 {
+            return "";
+        }
         unsafe {
             let slice = core::slice::from_raw_parts(self.data.cast(), self.length);
             core::str::from_utf8_unchecked(slice)
@@ -37,6 +43,12 @@ pub struct ada_owned_string {
 
 impl AsRef<str> for ada_owned_string {
     fn as_ref(&self) -> &str {
+        // We need to handle length 0 since data will be `nullptr`
+        // Not handling will result in a panic due to core::slice::from_raw_parts
+        // implementation
+        if self.length == 0 {
+            return "";
+        }
         unsafe {
             let slice = core::slice::from_raw_parts(self.data.cast(), self.length);
             core::str::from_utf8_unchecked(slice)
