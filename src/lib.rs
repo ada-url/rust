@@ -1079,4 +1079,12 @@ mod test {
         assert_eq!(first.href(), "https://lemire.me/");
         assert_eq!(second.href(), "https://yagiz.co/");
     }
+
+    #[test]
+    fn should_handle_empty_host() {
+        // Ref: https://github.com/ada-url/rust/issues/74
+        let url = Url::parse("file:///C:/Users/User/Documents/example.pdf", None).unwrap();
+        assert_eq!(url.host(), "");
+        assert_eq!(url.hostname(), "");
+    }
 }
