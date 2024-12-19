@@ -80,17 +80,14 @@ jobs:
       with:
         persist-credentials: true
 
-    - name: Install Rust toolchain
-      uses: moonrepo/setup-rust@v1
-      with:
-        bins: cargo-edit
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Publish to crates.io
       run: cargo publish
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-edit
 
     - name: Update Cargo.toml version
       env:
