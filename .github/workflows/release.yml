@@ -80,11 +80,6 @@ jobs:
       with:
         persist-credentials: true
 
-    - name: Publish to crates.io
-      run: cargo publish
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
     - uses: taiki-e/install-action@v2
       with:
         tool: cargo-edit
@@ -103,9 +98,14 @@ jobs:
     - name: Tag the version
       env:
         GIT_TAG: ${{ inputs.publish-tag }}
-      run: |
+      run: |+
         git tag "${GIT_TAG}"
         git push origin "${GIT_TAG}"
+
+    - name: Publish to crates.io
+      run: cargo publish
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
     - name: Create github release
       uses: taiki-e/create-gh-release-action@v1
