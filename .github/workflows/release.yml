@@ -23,7 +23,6 @@ jobs:
       matrix:
         include:
         - os: windows-latest
-        - os: ubuntu-latest
         - os: macos-latest
         - os: ubuntu-latest
           env:
@@ -83,6 +82,8 @@ jobs:
 
     - name: Install Rust toolchain
       uses: moonrepo/setup-rust@v1
+      with:
+        bins: cargo-edit
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -90,6 +91,17 @@ jobs:
       run: cargo publish
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+    - name: Update Cargo.toml version
+      env:
+        NEW_VERSION: ${{ inputs.publish-tag }}
+      run: |
+        VERSION=${NEW_VERSION#v}
+        cargo set-version "${VERSION}"
+
+        git add Cargo.toml
+        git commit -m "chore: bump version to ${NEW_VERSION}"
+        git push
 
     - name: Tag the version
       env:
