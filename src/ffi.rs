@@ -126,7 +126,7 @@ pub struct ada_url_components {
     pub hash_start: u32,
 }
 
-extern "C" {
+unsafe extern "C" {
     pub fn ada_parse(input: *const c_char, length: usize) -> *mut ada_url;
     pub fn ada_parse_with_base(
         input: *const c_char,
@@ -272,7 +272,7 @@ extern "C" {
         iter: *mut ada_url_search_params_keys_iter,
     ) -> ada_string;
     pub fn ada_search_params_keys_iter_has_next(iter: *mut ada_url_search_params_keys_iter)
-        -> bool;
+    -> bool;
 
     pub fn ada_free_search_params_values_iter(iter: *mut ada_url_search_params_values_iter);
     pub fn ada_search_params_values_iter_next(
