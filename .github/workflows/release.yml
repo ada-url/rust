@@ -40,8 +40,8 @@ jobs:
       if: matrix.env.CARGO_BUILD_TARGET == 'wasm32-wasip1'
       run: |
         rustup target add wasm32-wasip1
-        curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk_25.0_amd64.deb
-        sudo dpkg --install wasi-sdk_25.0_amd64.deb
+        curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-22/wasi-sdk_22.0_amd64.deb
+        sudo dpkg --install wasi-sdk_22.0_amd64.deb
         curl https://wasmtime.dev/install.sh -sSf | bash
 
     - uses: Swatinem/rust-cache@v2
