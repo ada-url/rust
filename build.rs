@@ -152,7 +152,7 @@ fn main() {
                 build.compiler(format!("{wasi_sdk}/bin/clang++"));
                 let wasi_sysroot_lib = match compile_target_feature {
                     Ok(compile_target_feature) if compile_target_feature.contains("atomics") => {
-                        "wasm32-wasi-threads"
+                        "wasm32-wasip1-threads"
                     }
                     _ => "wasm32-wasip1",
                 };
