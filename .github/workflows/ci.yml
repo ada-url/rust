@@ -40,7 +40,9 @@ jobs:
           rustup target add wasm32-wasip1
           curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.deb
           sudo dpkg --install wasi-sdk-25.0-x86_64-linux.deb
-          curl https://wasmtime.dev/install.sh -sSf | bash
+          curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v13.0.0/wasmtime-v13.0.0-x86_64-linux.tar.xz
+          tar xvf wasmtime-v13.0.0-x86_64-linux.tar.xz
+          echo `pwd`/wasmtime-v13.0.0-x86_64-linux >> $GITHUB_PATH
 
       - uses: Swatinem/rust-cache@v2
         with:
