@@ -194,11 +194,7 @@ type SetterResult = Result<(), ()>;
 
 #[inline]
 const fn setter_result(successful: bool) -> SetterResult {
-    if successful {
-        Ok(())
-    } else {
-        Err(())
-    }
+    if successful { Ok(()) } else { Err(()) }
 }
 
 impl Url {

@@ -116,7 +116,7 @@ fn main() {
         .file("./deps/ada.cpp")
         .include("./deps")
         .cpp(true)
-        .std("c++17");
+        .std("c++20");
 
     let compile_target_arch = env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH");
     let compile_target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS");

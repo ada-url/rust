@@ -1,4 +1,4 @@
-use crate::{ffi, ParseUrlError};
+use crate::{ParseUrlError, ffi};
 
 #[derive(Hash)]
 pub struct UrlSearchParams(*mut ffi::ada_url_search_params);
@@ -252,7 +252,8 @@ impl core::str::FromStr for UrlSearchParams {
 /// ```
 impl core::fmt::Display for UrlSearchParams {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(unsafe { ffi::ada_search_params_to_string(self.0).as_ref() })
+        let str = unsafe { ffi::ada_search_params_to_string(self.0) };
+        f.write_str(str.as_ref())
     }
 }
 
