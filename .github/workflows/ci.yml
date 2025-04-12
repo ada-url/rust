@@ -27,7 +27,7 @@ jobs:
           - os: macos-latest
           - os: ubuntu-latest
             env:
-              CARGO_BUILD_TARGET: wasm32-wasi
+              CARGO_BUILD_TARGET: wasm32-wasip1
               CARGO_TARGET_WASM32_WASI_RUNNER: /home/runner/.wasmtime/bin/wasmtime --dir=.
     runs-on: ${{ matrix.os }}
     env: ${{ matrix.env || fromJSON('{}') }}
@@ -35,9 +35,9 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Wasm deps
-        if: matrix.env.CARGO_BUILD_TARGET == 'wasm32-wasi'
+        if: matrix.env.CARGO_BUILD_TARGET == 'wasm32-wasip1'
         run: |
-          rustup target add wasm32-wasi
+          rustup target add wasm32-wasip1
           curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk_25.0_amd64.deb
           sudo dpkg --install wasi-sdk_25.0_amd64.deb
           curl https://wasmtime.dev/install.sh -sSf | bash
