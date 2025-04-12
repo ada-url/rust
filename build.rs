@@ -154,7 +154,7 @@ fn main() {
                     Ok(compile_target_feature) if compile_target_feature.contains("atomics") => {
                         "wasm32-wasi-threads"
                     }
-                    _ => "wasm32-wasi",
+                    _ => "wasm32-wasip1",
                 };
                 println!(
                     "cargo:rustc-link-search={wasi_sdk}/share/wasi-sysroot/lib/{wasi_sysroot_lib}"
@@ -169,7 +169,7 @@ fn main() {
                 // it's also possible to compile it to wasm32-unknown-unknown.
                 // This still requires WASI SDK for libc & libc++, but then we need a few hacks / overrides to get a pure Wasm w/o imports instead.
                 if compile_target_os == "unknown" {
-                    build.target("wasm32-wasi");
+                    build.target("wasm32-wasip1");
                     println!("cargo:rustc-link-lib=c");
                     build.file("./deps/wasi_to_unknown.cpp");
                 }
