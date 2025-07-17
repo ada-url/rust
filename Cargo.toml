@@ -6,7 +6,7 @@ authors = [
    "LongYinan <github@lyn.one>",
    "Boshen <boshenc@gmail.com>"
  ]
-version = "3.2.4"
+version = "3.2.6"
 edition = "2024"
 description = "Fast WHATWG Compliant URL parser"
 documentation = "https://docs.rs/ada-url"
