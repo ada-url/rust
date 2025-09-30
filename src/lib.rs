@@ -58,17 +58,22 @@ extern crate std;
 use std::string::String;
 
 use core::{borrow, ffi::c_uint, fmt, hash, ops};
-use derive_more::Display;
 
 /// Error type of [`Url::parse`].
-#[derive(Debug, Display, PartialEq, Eq)]
-#[cfg_attr(feature = "std", derive(derive_more::Error))] // error still requires std: https://github.com/rust-lang/rust/issues/103765
-#[display(bound(Input: core::fmt::Debug))]
-#[display("Invalid url: {input:?}")]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ParseUrlError<Input> {
     /// The invalid input that caused the error.
     pub input: Input,
 }
+
+impl<Input: core::fmt::Debug> fmt::Display for ParseUrlError<Input> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid url: {:?}", self.input)
+    }
+}
+
+#[cfg(feature = "std")] // error still requires std: https://github.com/rust-lang/rust/issues/103765
+impl<Input: core::fmt::Debug> std::error::Error for ParseUrlError<Input> {}
 
 /// Defines the type of the host.
 #[derive(Debug, Clone, PartialEq, Eq)]
