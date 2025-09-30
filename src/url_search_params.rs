@@ -182,7 +182,7 @@ impl UrlSearchParams {
     /// let pairs = params.get_all("a");
     /// assert_eq!(pairs.len(), 2);
     /// ```
-    pub fn get_all(&self, key: &str) -> UrlSearchParamsEntry {
+    pub fn get_all(&self, key: &str) -> UrlSearchParamsEntry<'_> {
         unsafe {
             let strings = ffi::ada_search_params_get_all(self.0, key.as_ptr().cast(), key.len());
             let size = ffi::ada_strings_size(strings);
@@ -198,7 +198,7 @@ impl UrlSearchParams {
     ///     .expect("String should have been able to be parsed into an UrlSearchParams.");
     /// let mut keys = params.keys();
     /// assert!(keys.next().is_some());
-    pub fn keys(&self) -> UrlSearchParamsKeyIterator {
+    pub fn keys(&self) -> UrlSearchParamsKeyIterator<'_> {
         let iterator = unsafe { ffi::ada_search_params_get_keys(self.0) };
         UrlSearchParamsKeyIterator::new(iterator)
     }
@@ -211,7 +211,7 @@ impl UrlSearchParams {
     ///     .expect("String should have been able to be parsed into an UrlSearchParams.");
     /// let mut values = params.values();
     /// assert!(values.next().is_some());
-    pub fn values(&self) -> UrlSearchParamsValueIterator {
+    pub fn values(&self) -> UrlSearchParamsValueIterator<'_> {
         let iterator = unsafe { ffi::ada_search_params_get_values(self.0) };
         UrlSearchParamsValueIterator::new(iterator)
     }
@@ -225,7 +225,7 @@ impl UrlSearchParams {
     /// let mut entries = params.entries();
     /// assert_eq!(entries.next(), Some(("a", "1")));
     /// ```
-    pub fn entries(&self) -> UrlSearchParamsEntryIterator {
+    pub fn entries(&self) -> UrlSearchParamsEntryIterator<'_> {
         let iterator = unsafe { ffi::ada_search_params_get_entries(self.0) };
         UrlSearchParamsEntryIterator::new(iterator)
     }
