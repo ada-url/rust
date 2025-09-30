@@ -32,7 +32,6 @@ serde = ["dep:serde", "std"]
 std = []
 
 [dependencies]
-derive_more = { version = "1", features = ["full"] }
 serde = { version = "1", optional = true, features = ["derive"] }
 
 [dev-dependencies]
