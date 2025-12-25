@@ -42,7 +42,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-pub mod ffi;
+mod ffi;
 mod idna;
 mod url_search_params;
 pub use idna::Idna;
