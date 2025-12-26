@@ -126,6 +126,7 @@ pub struct ada_url_components {
     pub hash_start: u32,
 }
 
+#[allow(dead_code)]
 unsafe extern "C" {
     pub fn ada_parse(input: *const c_char, length: usize) -> *mut ada_url;
     pub fn ada_parse_with_base(
