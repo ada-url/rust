@@ -148,6 +148,7 @@ unsafe extern "C" {
     pub fn ada_get_components(url: *mut ada_url) -> *mut ada_url_components;
 
     // Getters
+    #[cfg(feature = "std")]
     pub fn ada_get_origin(url: *mut ada_url) -> ada_owned_string;
     pub fn ada_get_href(url: *mut ada_url) -> ada_string;
     pub fn ada_get_username(url: *mut ada_url) -> ada_string;
@@ -191,7 +192,9 @@ unsafe extern "C" {
     pub fn ada_has_search(url: *mut ada_url) -> bool;
 
     // IDNA methods
+    #[cfg(feature = "std")]
     pub fn ada_idna_to_unicode(input: *const c_char, length: usize) -> ada_owned_string;
+    #[cfg(feature = "std")]
     pub fn ada_idna_to_ascii(input: *const c_char, length: usize) -> ada_owned_string;
 
     // URLSearchParams
@@ -293,9 +296,11 @@ unsafe extern "C" {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "std")]
     use crate::ffi;
 
     #[test]
+    #[cfg(feature = "std")]
     fn ada_free_owned_string_works() {
         let str = "meßagefactory.ca";
         let result = unsafe { ffi::ada_idna_to_ascii(str.as_ptr().cast(), str.len()) };
