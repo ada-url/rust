@@ -1,0 +1,159 @@
+{
+  "comment": [
+    "#Additional tests designed by the ada team."
+  ],
+  "href": [
+    {
+      "comment": "Update with pathname, fragment and search state filled",
+      "href": "https://yagiz.co",
+      "new_value": "https://google.com/url?search=true#fragment",
+      "expected": {
+        "href": "https://google.com/url?search=true#fragment"
+      }
+    },
+    {
+      "comment": "Update with authority state filled",
+      "href": "https://yagiz.co",
+      "new_value": "https://username:password@localhost:5432/my-db",
+      "expected": {
+        "href": "https://username:password@localhost:5432/my-db"
+      }
+    },
+    {
+      "comment": "Removes leading and trailing control characters",
+      "href": "https://yagiz.co",
+      "new_value": "\u0000http://www.google.com\u0000",
+      "expected": {
+        "href": "http://www.google.com/"
+      }
+    }
+  ],
+  "port": [
+    {
+      "comment": "Should not update on leading control characters",
+      "href": "https://yagiz.co:443",
+      "new_value": "\u000080\u0000",
+      "expected": {
+        "port": ""
+      }
+    },
+    {
+      "comment": "Leading u0009 on special scheme",
+      "href": "https://yagiz.co:443",
+      "new_value": "\u00098080",
+      "expected": {
+        "port": "8080"
+      }
+    },
+    {
+      "comment": "Leading u0009 on non-special scheme",
+      "href": "wpt++://yagiz.co:443",
+      "new_value": "\u00098080",
+      "expected": {
+        "port": "8080"
+      }
+    },
+    {
+      "comment": "Trailing control characters",
+      "href": "https://yagiz.co:443",
+      "new_value": "8080\u0000",
+      "expected": {
+        "port": "8080"
+      }
+    },
+    {
+      "href": "https://yagiz.co",
+      "new_value": "\u000044\u00093\u0000",
+      "expected": {
+        "port": ""
+      }
+    },
+    {
+      "href": "https://yagiz.co:443",
+      "new_value": "\u0000\u0009\u0000",
+      "expected": {
+        "port": ""
+      }
+    },
+    {
+      "comment": "Should remove port on invalid input",
+      "href": "https://www.google.com:443",
+      "new_value": "99999",
+      "expected": {
+        "port": ""
+      }
+    },
+    {
+      "comment": "Should revert back to original on invalid input",
+      "href": "https://www.google.com:4343",
+      "new_value": "yagiz",
+      "expected": {
+        "port": "4343"
+      }
+    },
+    {
+      "comment": "Should use all ascii prefixed characters as port",
+      "href": "https://www.google.com:4343",
+      "new_value": "4yagiz",
+      "expected": {
+        "port": "4"
+      }
+    },
+    {
+      "href": "https://domain.com:3000",
+      "new_value": "\n\t80\n\t80\n\t",
+      "expected": {
+          "port": "8080"
+      }
+    },
+    {
+        "href": "https://domain.com:3000",
+        "new_value": "\n\n\t\t",
+        "expected": {
+            "port": "3000"
+        }
+    }
+  ],
+  "hash": [
+    {
+      "comment": "Should not trim leading and trailing control characters",
+      "href": "https://domain.com",
+      "new_value": "\u0000hello\u0000",
+      "expected": {
+        "hash": "#%00hello%00"
+      }
+    }
+  ],
+  "pathname": [
+    {
+      "comment": "Used by Node.js by node::url::FromFilePath",
+      "href": "file://",
+      "new_value": "/Users/yagiz/Developer/node/test/fixtures/loop.%25.js",
+      "expected": {
+        "pathname": "/Users/yagiz/Developer/node/test/fixtures/loop.%25.js"
+      }
+    }
+  ],
+  "search": [
+    {
+      "comment": "Remove non-existent param removes ? from URL",
+      "href": "data:space    ?test",
+      "new_value": "",
+      "expected": {
+        "search": "",
+        "pathname": "space   %20"
+      }
+    }
+  ],
+  "host": [
+    {
+      "href": "foo://path/to",
+      "new_value": ":80",
+      "expected": {
+        "href": "foo://path/to",
+        "host": "path",
+        "port": ""
+      }
+    }
+  ]
+}
