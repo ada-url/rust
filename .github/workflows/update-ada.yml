@@ -1,0 +1,91 @@
+name: Update Ada
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Check for new Ada releases weekly on Mondays at 09:00 UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  update:
+    name: Update Ada single-header
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: true
+
+      - name: Download latest Ada single-header release
+        run: .github/update-ada.sh
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet deps/; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Get new Ada version
+        if: steps.diff.outputs.changed == 'true'
+        id: version
+        run: |
+          VERSION=$(grep -oP '(?<=ADA_VERSION ")[^"]+' deps/ada.h | head -1)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit updated deps
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          ADA_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b chore/update-ada-${ADA_VERSION}
+          git add deps/
+          git commit -m "chore: update ada to ${ADA_VERSION}"
+          git push -u origin chore/update-ada-${ADA_VERSION}
+
+  test:
+    name: Build & Test (${{ matrix.os }})
+    needs: update
+    if: needs.update.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: chore/update-ada-${{ needs.update.outputs.version }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: update-ada
+
+      - run: rustup show
+
+      - name: Run tests
+        run: cargo test
+
+  open-pr:
+    name: Open pull request
+    needs: [update, test]
+    if: needs.update.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: chore/update-ada-${{ needs.update.outputs.version }}
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          title: "chore: update Ada to ${{ needs.update.outputs.version }}"
+          body: "Automated update of the Ada single-header files to version ${{ needs.update.outputs.version }}."
+          branch: chore/update-ada-${{ needs.update.outputs.version }}
+          labels: dependencies
