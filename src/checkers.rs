@@ -66,9 +66,8 @@ pub fn is_ipv4(input: &str) -> bool {
     let last_char = b[b.len() - 1];
 
     // Quick filter: the last character must be a decimal digit, a-f, or 'x'
-    let possible = last_char.is_ascii_digit()
-        || matches!(last_char, b'a'..=b'f')
-        || last_char == b'x';
+    let possible =
+        last_char.is_ascii_digit() || matches!(last_char, b'a'..=b'f') || last_char == b'x';
     if !possible {
         return false;
     }
@@ -119,34 +118,54 @@ pub fn is_ipv4(input: &str) -> bool {
 const PATH_SIG_TABLE: [u8; 256] = {
     let mut t = [0u8; 256];
     // Needs encoding: C0 controls (0x00-0x1F), DEL (0x7F), high bytes (0x80-0xFF)
-    let mut i = 0usize; while i <= 0x1F { t[i] |= 0x01; i += 1; }
-    let mut i = 0x7Fusize; while i < 256 { t[i] |= 0x01; i += 1; }
+    let mut i = 0usize;
+    while i <= 0x1F {
+        t[i] |= 0x01;
+        i += 1;
+    }
+    let mut i = 0x7Fusize;
+    while i < 256 {
+        t[i] |= 0x01;
+        i += 1;
+    }
     // Needs encoding: specific printable ASCII chars
     let enc: &[u8] = b" \"#<>?^`{|}";
 
-    let mut i = 0; while i < enc.len() { t[enc[i] as usize] |= 0x01; i += 1; }
+    let mut i = 0;
+    while i < enc.len() {
+        t[enc[i] as usize] |= 0x01;
+        i += 1;
+    }
     // Special flags
     t[b'\\' as usize] |= 0x02; // backslash
-    t[b'.'  as usize] |= 0x04; // dot
-    t[b'%'  as usize] |= 0x08; // percent
+    t[b'.' as usize] |= 0x04; // dot
+    t[b'%' as usize] |= 0x08; // percent
     t
 };
 
-/// Compute a path-signature byte via an unrolled table lookup — branch-free.
-/// Returns a bitmask of the flags above.
+/// Compute a path-signature byte via Ada's exact 8-at-a-time unrolled lookup.
+///
+/// Ada C++ uses `for (; i + 7 < size; i += 8)` — we match that exactly.
 pub fn path_signature(input: &str) -> u8 {
     let b = input.as_bytes();
     let mut acc = 0u8;
     let mut i = 0;
-    // Unrolled 4-at-a-time — same as Ada C++ style
-    while i + 4 <= b.len() {
-        acc |= PATH_SIG_TABLE[b[i]   as usize]
-             | PATH_SIG_TABLE[b[i+1] as usize]
-             | PATH_SIG_TABLE[b[i+2] as usize]
-             | PATH_SIG_TABLE[b[i+3] as usize];
-        i += 4;
+    // 8-at-a-time — Ada C++ uses this exact unroll factor
+    while i + 8 <= b.len() {
+        acc |= PATH_SIG_TABLE[b[i] as usize]
+            | PATH_SIG_TABLE[b[i + 1] as usize]
+            | PATH_SIG_TABLE[b[i + 2] as usize]
+            | PATH_SIG_TABLE[b[i + 3] as usize]
+            | PATH_SIG_TABLE[b[i + 4] as usize]
+            | PATH_SIG_TABLE[b[i + 5] as usize]
+            | PATH_SIG_TABLE[b[i + 6] as usize]
+            | PATH_SIG_TABLE[b[i + 7] as usize];
+        i += 8;
     }
-    while i < b.len() { acc |= PATH_SIG_TABLE[b[i] as usize]; i += 1; }
+    while i < b.len() {
+        acc |= PATH_SIG_TABLE[b[i] as usize];
+        i += 1;
+    }
     acc
 }
 

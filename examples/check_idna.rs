@@ -6,16 +6,24 @@ fn main() {
     let arr = v.as_array().unwrap();
     let mut wrong = 0;
     for elem in arr.iter() {
-        if elem.is_string() { continue; }
+        if elem.is_string() {
+            continue;
+        }
         let o = elem.as_object().unwrap();
         let input = o["input"].as_str().unwrap_or("");
         let expected = o.get("output").unwrap();
         let result = Idna::ascii(input);
         if expected.is_null() {
-            if !result.is_empty() { eprintln!("SHOULD_FAIL {:?} -> {:?}", input, result); wrong+=1; }
+            if !result.is_empty() {
+                eprintln!("SHOULD_FAIL {:?} -> {:?}", input, result);
+                wrong += 1;
+            }
         } else {
             let exp = expected.as_str().unwrap();
-            if result != exp { eprintln!("WRONG {:?}: got={:?} exp={:?}", input, result, exp); wrong+=1; }
+            if result != exp {
+                eprintln!("WRONG {:?}: got={:?} exp={:?}", input, result, exp);
+                wrong += 1;
+            }
         }
     }
     eprintln!("Total wrong: {}", wrong);

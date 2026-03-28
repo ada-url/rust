@@ -17,8 +17,8 @@ use crate::checkers::{
 };
 use crate::scheme::SchemeType;
 use crate::unicode::{
-    is_c0_control_or_space, is_double_dot_path_segment,
-    is_single_dot_path_segment, percent_encode_append,
+    is_c0_control_or_space, is_double_dot_path_segment, is_single_dot_path_segment,
+    percent_encode_append,
 };
 
 // ---------------------------------------------------------------------------
@@ -66,6 +66,7 @@ pub fn remove_ascii_tab_or_newline(s: &mut String) {
 /// Trim leading and trailing C0 control characters and ASCII space.
 /// Returns a `&str` slice into the original — **zero allocation**.
 #[inline]
+#[allow(dead_code)]
 pub fn trim_c0_whitespace(s: &str) -> &str {
     let start = s
         .as_bytes()

@@ -15,7 +15,10 @@ extern crate alloc;
 extern crate std;
 
 #[cfg(not(feature = "std"))]
-use alloc::{borrow::Cow, string::{String, ToString}};
+use alloc::{
+    borrow::Cow,
+    string::{String, ToString},
+};
 #[cfg(feature = "std")]
 use std::{borrow::Cow, string::String};
 
@@ -35,11 +38,11 @@ pub(crate) mod idna_tables;
 pub(crate) mod parser;
 pub(crate) mod scheme;
 pub(crate) mod serializers;
+#[cfg(feature = "simd")]
+pub(crate) mod simd;
 pub(crate) mod unicode;
 pub(crate) mod url_search_params;
 pub(crate) mod validator;
-#[cfg(feature = "simd")]
-pub(crate) mod simd;
 
 pub use idna::Idna;
 pub use url_search_params::{
@@ -127,7 +130,7 @@ use checkers::{
     is_ipv4, is_windows_drive_letter, path_signature, try_parse_ipv4_fast, verify_dns_length,
 };
 use helpers::{
-    get_host_delimiter_location, parse_prepared_path, strip_tabs_newlines, shorten_path,
+    get_host_delimiter_location, parse_prepared_path, shorten_path, strip_tabs_newlines,
     strip_trailing_spaces_from_opaque_path,
 };
 use scheme::SchemeType as Scheme;
@@ -235,8 +238,17 @@ impl Url {
     #[must_use]
     pub fn can_parse(input: &str, base: Option<&str>) -> bool {
         match base {
-            // Zero-allocation fast path: no base, no String buffer needed.
-            None => validator::can_parse_no_base(input),
+            None => {
+                // Ultra-fast path: single-scan validator, zero allocations.
+                // Handles the common case (absolute ASCII URL, simple host) in
+                // one forward pass with no function-call overhead.
+                if parser::try_validate_absolute_fast(input).is_some() {
+                    return true;
+                }
+                // Full validator for edge cases: credentials, IPv4/IPv6, IDNA,
+                // non-special schemes, relative URLs (still zero-allocation).
+                validator::can_parse_no_base(input)
+            }
             // With a base we still need relative resolution — parse both URLs.
             Some(b) => {
                 let base_url = match parser::parse_url(b, None) {
@@ -508,9 +520,10 @@ impl Url {
             let path = self.pathname();
             if !path.is_empty()
                 && let Some(out) = parser::parse_url(path, None)
-                    && (out.scheme == Scheme::Http || out.scheme == Scheme::Https) {
-                        return std::format!("{}//{}", out.protocol(), out.host());
-                    }
+                && (out.scheme == Scheme::Http || out.scheme == Scheme::Https)
+            {
+                return std::format!("{}//{}", out.protocol(), out.host());
+            }
         }
         "null".to_string()
     }
@@ -744,7 +757,7 @@ impl Url {
             unicode::to_lower_ascii(&mut buf[..slen]);
             buf[slen] = b':';
             let lo_with_colon = unsafe { core::str::from_utf8_unchecked(&buf[..slen + 1]) };
-            let lo_scheme     = unsafe { core::str::from_utf8_unchecked(&buf[..slen]) };
+            let lo_scheme = unsafe { core::str::from_utf8_unchecked(&buf[..slen]) };
             self.scheme = scheme::get_scheme_type(lo_scheme);
             self.set_scheme_from_view_with_colon(lo_with_colon);
         } else {
@@ -990,7 +1003,8 @@ impl Url {
             self.buffer.replace_range(s..s + old, &ps);
             ps.len() as i64 - old as i64
         } else {
-            self.buffer.insert_str(self.components.host_end as usize, &ps);
+            self.buffer
+                .insert_str(self.components.host_end as usize, &ps);
             ps.len() as i64
         };
         self.components.pathname_start = (self.components.pathname_start as i64 + diff) as u32;
@@ -1706,8 +1720,12 @@ fn set_protocol_impl(url: &mut Url, input: &str) -> bool {
     // CoW: borrow when no tabs/newlines (common path), own otherwise
     let v_cow = strip_tabs_newlines(input);
     let v: &str = &v_cow;
-    if v.is_empty() { return true; }
-    if !checkers::is_alpha(v.as_bytes()[0]) { return false; }
+    if v.is_empty() {
+        return true;
+    }
+    if !checkers::is_alpha(v.as_bytes()[0]) {
+        return false;
+    }
 
     // Find the end of scheme characters (alnum+/-/.)
     let end = v.bytes().position(|b| !is_alnum_plus(b)).unwrap_or(v.len());
@@ -1721,7 +1739,9 @@ fn set_protocol_impl(url: &mut Url, input: &str) -> bool {
         // Input has no ':' — the whole thing is the scheme. Append ':' via a
         // stack buffer so we avoid a heap allocation on this path too.
         let slen = end;
-        if slen > 15 { return false; }
+        if slen > 15 {
+            return false;
+        }
         let mut buf = [0u8; 64];
         buf[..slen].copy_from_slice(&v.as_bytes()[..slen]);
         buf[slen] = b':';
@@ -1739,13 +1759,21 @@ fn parse_scheme_override(url: &mut Url, with_colon: &str) -> bool {
     // Use a macro-like helper to avoid duplication between stack/heap paths
     let do_override = |url: &mut Url, lo_with_colon: &str, lo_scheme: &str| -> bool {
         let parsed = scheme::get_scheme_type(lo_scheme);
-        if (parsed != Scheme::NotSpecial) != url.is_special() { return false; }
-        if (url.has_credentials() || url.components.port != OMITTED) && parsed == Scheme::File { return false; }
-        if url.scheme == Scheme::File && url.components.host_start == url.components.host_end { return false; }
+        if (parsed != Scheme::NotSpecial) != url.is_special() {
+            return false;
+        }
+        if (url.has_credentials() || url.components.port != OMITTED) && parsed == Scheme::File {
+            return false;
+        }
+        if url.scheme == Scheme::File && url.components.host_start == url.components.host_end {
+            return false;
+        }
         url.scheme = parsed;
         url.set_scheme_from_view_with_colon(lo_with_colon);
         let def = url.default_port();
-        if def != 0 && url.components.port == def as u32 { url.clear_port(); }
+        if def != 0 && url.components.port == def as u32 {
+            url.clear_port();
+        }
         true
     };
     if slen <= 63 {
@@ -1914,9 +1942,7 @@ fn set_host_or_hostname(url: &mut Url, input: &str, hostname_only: bool) -> bool
             return true;
         }
     }
-    let end = hv
-        .find(['/', '\\', '?'])
-        .unwrap_or(hv.len());
+    let end = hv.find(['/', '\\', '?']).unwrap_or(hv.len());
     let nh = &hv[..end];
     if nh.is_empty() {
         url.clear_hostname();

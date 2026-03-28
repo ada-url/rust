@@ -70,9 +70,14 @@ fn find_longest_zeros(addr: &[u16; 8]) -> (usize, usize) {
     let mut cur_len = 0usize;
     for (i, &v) in addr.iter().enumerate() {
         if v == 0 {
-            if cur_len == 0 { cur_start = i; }
+            if cur_len == 0 {
+                cur_start = i;
+            }
             cur_len += 1;
-            if cur_len > best_len { best_len = cur_len; best_start = cur_start; }
+            if cur_len > best_len {
+                best_len = cur_len;
+                best_start = cur_start;
+            }
         } else {
             cur_len = 0;
         }

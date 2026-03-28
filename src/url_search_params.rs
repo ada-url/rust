@@ -7,7 +7,10 @@ extern crate alloc;
 extern crate std;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "std")]
 use std::{string::String, vec::Vec};
 

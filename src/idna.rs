@@ -39,9 +39,13 @@ mod tests {
 
     #[test]
     #[cfg(feature = "std")]
-    fn unicode_works() { assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca"), "meßagefactory.ca"); }
+    fn unicode_works() {
+        assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca"), "meßagefactory.ca");
+    }
 
     #[test]
     #[cfg(feature = "std")]
-    fn ascii_works() { assert_eq!(Idna::ascii("meßagefactory.ca"), "xn--meagefactory-m9a.ca"); }
+    fn ascii_works() {
+        assert_eq!(Idna::ascii("meßagefactory.ca"), "xn--meagefactory-m9a.ca");
+    }
 }

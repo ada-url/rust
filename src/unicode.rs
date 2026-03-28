@@ -74,9 +74,14 @@ pub const fn is_c0_control_or_space(c: u8) -> bool {
 /// Forbidden host code point table (single bool per byte).
 const IS_FORBIDDEN_HOST: [bool; 256] = {
     let mut t = [false; 256];
-    let chars: &[u8] = &[0,9,10,13,32,35,47,58,60,62,63,64,91,92,93,94,124];
+    let chars: &[u8] = &[
+        0, 9, 10, 13, 32, 35, 47, 58, 60, 62, 63, 64, 91, 92, 93, 94, 124,
+    ];
     let mut i = 0;
-    while i < chars.len() { t[chars[i] as usize] = true; i += 1; }
+    while i < chars.len() {
+        t[chars[i] as usize] = true;
+        i += 1;
+    }
     t
 };
 
@@ -86,18 +91,33 @@ const IS_FORBIDDEN_HOST: [bool; 256] = {
 ///
 /// Matching what Ada C++ does: a single table lookup replaces a chain of
 /// range/bitwise comparisons and an uppercase test.
-const DOMAIN_CHECK: [u8; 256] = {
+pub(crate) const DOMAIN_CHECK: [u8; 256] = {
     let mut t = [0u8; 256];
     // forbidden: ≤ 0x20
-    let mut c = 0usize; while c <= 32 { t[c] |= 1; c += 1; }
+    let mut c = 0usize;
+    while c <= 32 {
+        t[c] |= 1;
+        c += 1;
+    }
     // forbidden: ≥ 0x7F
-    let mut c = 127usize; while c < 256 { t[c] |= 1; c += 1; }
+    let mut c = 127usize;
+    while c < 256 {
+        t[c] |= 1;
+        c += 1;
+    }
     // forbidden: specific ASCII chars
     let extra: &[u8] = b"#/:<>?@[\\]^|%";
     let mut i = 0;
-    while i < extra.len() { t[extra[i] as usize] |= 1; i += 1; }
+    while i < extra.len() {
+        t[extra[i] as usize] |= 1;
+        i += 1;
+    }
     // uppercase A-Z
-    let mut c = b'A'; while c <= b'Z' { t[c as usize] |= 2; c += 1; }
+    let mut c = b'A';
+    while c <= b'Z' {
+        t[c as usize] |= 2;
+        c += 1;
+    }
     t
 };
 
@@ -117,13 +137,16 @@ pub fn contains_forbidden_domain_code_point(s: &[u8]) -> bool {
     let mut acc = 0u8;
     let mut i = 0;
     while i + 4 <= s.len() {
-        acc |= DOMAIN_CHECK[s[i]   as usize]
-             | DOMAIN_CHECK[s[i+1] as usize]
-             | DOMAIN_CHECK[s[i+2] as usize]
-             | DOMAIN_CHECK[s[i+3] as usize];
+        acc |= DOMAIN_CHECK[s[i] as usize]
+            | DOMAIN_CHECK[s[i + 1] as usize]
+            | DOMAIN_CHECK[s[i + 2] as usize]
+            | DOMAIN_CHECK[s[i + 3] as usize];
         i += 4;
     }
-    while i < s.len() { acc |= DOMAIN_CHECK[s[i] as usize]; i += 1; }
+    while i < s.len() {
+        acc |= DOMAIN_CHECK[s[i] as usize];
+        i += 1;
+    }
     acc & 1 != 0
 }
 
@@ -137,13 +160,16 @@ pub fn contains_forbidden_domain_code_point_or_upper(s: &[u8]) -> u8 {
     let mut acc = 0u8;
     let mut i = 0;
     while i + 4 <= s.len() {
-        acc |= DOMAIN_CHECK[s[i]   as usize]
-             | DOMAIN_CHECK[s[i+1] as usize]
-             | DOMAIN_CHECK[s[i+2] as usize]
-             | DOMAIN_CHECK[s[i+3] as usize];
+        acc |= DOMAIN_CHECK[s[i] as usize]
+            | DOMAIN_CHECK[s[i + 1] as usize]
+            | DOMAIN_CHECK[s[i + 2] as usize]
+            | DOMAIN_CHECK[s[i + 3] as usize];
         i += 4;
     }
-    while i < s.len() { acc |= DOMAIN_CHECK[s[i] as usize]; i += 1; }
+    while i < s.len() {
+        acc |= DOMAIN_CHECK[s[i] as usize];
+        i += 1;
+    }
     acc
 }
 
@@ -352,8 +378,8 @@ pub fn to_ascii<'a>(plain: &'a str, first_percent: Option<usize>) -> Option<Cow<
     };
 
     match crate::idna_impl::domain_to_ascii(input) {
-        Some(result) if !result.is_empty()
-            && !contains_forbidden_domain_code_point(result.as_bytes()) =>
+        Some(result)
+            if !result.is_empty() && !contains_forbidden_domain_code_point(result.as_bytes()) =>
         {
             Some(Cow::Owned(result))
         }
