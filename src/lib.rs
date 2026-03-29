@@ -218,6 +218,28 @@ impl Url {
     where
         Input: AsRef<str>,
     {
+        let input_str = input.as_ref();
+
+        // Optimised path: when a base is supplied but the input is itself an
+        // absolute URL, the parsed base is never consulted for resolution.
+        // Instead of fully parsing the base string into a `Url` (which
+        // allocates a String buffer), validate it with the zero-allocation
+        // validator.  The spec still requires failure when the base is invalid,
+        // so we check that too — but without heap allocation.
+        if let Some(b) = base
+            && let Some(url) = parser::try_parse_absolute_fast(input_str)
+        {
+            // Validate base cheaply: try the zero-alloc fast checker first,
+            // fall back to the full zero-alloc validator for edge cases.
+            let base_ok =
+                parser::try_validate_absolute_fast(b).is_some() || validator::can_parse_no_base(b);
+            return if base_ok {
+                Ok(url)
+            } else {
+                Err(ParseUrlError { input })
+            };
+        }
+
         let base_url = if let Some(b) = base {
             match parser::parse_url(b, None) {
                 Some(u) if u.is_valid => Some(u),
@@ -227,9 +249,30 @@ impl Url {
             None
         };
 
-        match parser::parse_url(input.as_ref(), base_url.as_ref()) {
+        match parser::parse_url(input_str, base_url.as_ref()) {
             Some(u) if u.is_valid => Ok(u),
             _ => Err(ParseUrlError { input }),
+        }
+    }
+
+    /// Parse `input` relative to an already-parsed `base` URL.
+    ///
+    /// This is more efficient than [`Url::parse`] with a base string because the
+    /// base URL is **not** re-parsed — use this in hot loops where the same base
+    /// is reused across many inputs (e.g. the WPT URL benchmark pattern).
+    ///
+    /// Returns `None` when either `base` is invalid or `input` cannot be resolved.
+    #[must_use]
+    pub fn parse_with_base<Input>(input: Input, base: &Url) -> Option<Self>
+    where
+        Input: AsRef<str>,
+    {
+        if !base.is_valid {
+            return None;
+        }
+        match parser::parse_url(input.as_ref(), Some(base)) {
+            Some(u) if u.is_valid => Some(u),
+            _ => None,
         }
     }
 
@@ -1680,6 +1723,35 @@ impl Url {
         if trivial && self.is_at_path() {
             self.buffer.push('/');
             self.buffer.push_str(input);
+            return;
+        }
+        // Fast append: path already set, no dot-segments, no encoding, AND
+        // no search/fragment follows the path in the buffer.  Only then can
+        // we safely push directly to the buffer end without displacing query
+        // or fragment bytes that sit after the current path.
+        //
+        // Extra guard: when the current path is exactly "/" appending "/"
+        // + input would produce "//input".  `update_base_pathname("//...")` has
+        // a side-effect of inserting "/." for authority-less URLs; bypassing it
+        // would produce a wrong href (e.g. "non-spec://path" instead of
+        // "non-spec:/.//path").  Avoid fast_append for this edge case.
+        let fast_append = trivial
+            && !self.is_at_path()
+            && !input.starts_with("..")
+            && !input.starts_with('.')
+            && self.components.search_start == OMITTED
+            && self.components.hash_start == OMITTED
+            && self.pathname() != "/";
+        if fast_append {
+            let added = (1 + input.len()) as u32;
+            self.buffer.push('/');
+            self.buffer.push_str(input);
+            if self.components.search_start != OMITTED {
+                self.components.search_start += added;
+            }
+            if self.components.hash_start != OMITTED {
+                self.components.hash_start += added;
+            }
             return;
         }
         let mut new_path = if self.is_at_path() {

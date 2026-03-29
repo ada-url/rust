@@ -56,12 +56,25 @@ pub fn parse_url(user_input: &str, base: Option<&Url>) -> Option<Url> {
     }
 
     // ── Fast path ─────────────────────────────────────────────────────────
-    // For absolute URLs without a base we try the ultra-fast path BEFORE
-    // any pre-processing.  It inlines C0 trim, tab detection, fragment split,
-    // host validation, and buffer build in a single forward scan, saving the
-    // three separate pre-processing passes that the slow path performs.
-    if base.is_none()
-        && let Some(url) = try_parse_absolute_fast(user_input)
+    // Try the ultra-fast single-scan builder unconditionally — even when a
+    // base is present.  An absolute URL (one that has its own scheme + "://")
+    // never needs the base for resolution, so the base can be ignored when the
+    // fast path succeeds.  The fast path is conservative: it returns None for
+    // anything that could be relative or that requires the base (opaque paths,
+    // same-scheme inputs without "//", relative paths, etc.), so falling
+    // through to the state machine remains fully correct for those cases.
+    if let Some(url) = try_parse_absolute_fast(user_input) {
+        return Some(url);
+    }
+
+    // ── Relative URL fast paths ────────────────────────────────────────────
+    // For the most common relative URL patterns (#fragment, ?query) we can
+    // skip the full state machine entirely: C0-trim the input, then clone the
+    // base URL and splice in only the changed components.  This avoids
+    // `strip_tabs_newlines` + `trim_c0_whitespace` + all the state transitions
+    // and per-component string copies the state machine would perform.
+    if let Some(base_url) = base
+        && let Some(url) = try_parse_relative_fast(user_input, base_url)
     {
         return Some(url);
     }
@@ -78,7 +91,14 @@ pub fn parse_url(user_input: &str, base: Option<&Url>) -> Option<Url> {
     let b = url_data.as_bytes();
 
     let mut url = Url::empty();
-    url.buffer.reserve(input_size + 4);
+    // When a base is present the output URL will typically include the base's
+    // scheme + authority + path, so pre-reserve enough capacity to avoid
+    // any realloc mid-construction.
+    let initial_cap = match base {
+        Some(base_url) => base_url.buffer.len() + input_size + 16,
+        None => input_size + 4,
+    };
+    url.buffer.reserve(initial_cap);
 
     let mut state = State::SchemeStart;
     let mut pos: usize = 0;
@@ -186,21 +206,43 @@ pub fn parse_url(user_input: &str, base: Option<&Url>) -> Option<Url> {
                     url.update_host_to_base_host(base.hostname());
                     url.update_base_port(base.retrieve_base_port());
                     url.has_opaque_path = base.has_opaque_path;
-                    url.update_base_pathname(base.pathname());
                     if base.has_search() {
                         let s = base.search();
                         url.update_base_search(if s.is_empty() { "?" } else { s });
                     }
                     if pos < input_size && b[pos] == b'?' {
+                        // Replace with fresh query; keep authority+path from base.
+                        url.update_base_pathname(base.pathname());
                         url.clear_search();
                         state = State::Query;
                     } else if pos < input_size {
+                        // Relative path resolution: copy the shortened base pathname.
+                        //
+                        // For the common case (base pathname does NOT start with "//"
+                        // and scheme is not file:), we compute the shortened form
+                        // directly — no temporary String allocation needed.
+                        //
+                        // When base.pathname() starts with "//" we must use the
+                        // original two-step approach, because the first call triggers
+                        // "/."-insertion side-effects that the second call relies on.
+                        let base_path = base.pathname();
+                        if !base_path.starts_with("//") && url.scheme != Scheme::File {
+                            // Optimised single-call path — common case.
+                            let cut = base_path.rfind('/').unwrap_or(base_path.len());
+                            url.update_base_pathname(&base_path[..cut]);
+                        } else {
+                            // Original two-step — needed for "//"-prefixed paths and
+                            // file: Windows-drive-letter edge cases.
+                            url.update_base_pathname(base_path);
+                            let mut tmp = url.pathname().to_string();
+                            shorten_path(&mut tmp, url.scheme);
+                            url.update_base_pathname(&tmp);
+                        }
                         url.clear_search();
-                        let mut path = url.pathname().to_string();
-                        shorten_path(&mut path, url.scheme);
-                        url.update_base_pathname(&path);
                         state = State::Path;
                         continue; // re-enter Path without advancing
+                    } else {
+                        url.update_base_pathname(base.pathname());
                     }
                 }
                 pos += 1;
@@ -510,9 +552,20 @@ pub fn parse_url(user_input: &str, base: Option<&Url>) -> Option<Url> {
                             url.clear_search();
                             let fv = &url_data[pos..];
                             if !is_windows_drive_letter(fv) {
-                                let mut path = url.pathname().to_string();
-                                shorten_path(&mut path, url.scheme);
-                                url.update_base_pathname(&path);
+                                // Shorten base pathname without allocating.
+                                // Mirrors shorten_path() for file: scheme:
+                                // if the path has no '/' after the first char
+                                // AND looks like a drive letter, don't shorten.
+                                let full = base.pathname();
+                                let cut = if !full.is_empty()
+                                    && full[1..].find('/').is_none()
+                                    && is_normalized_windows_drive_letter(&full[1..])
+                                {
+                                    full.len() // drive-letter only — don't shorten
+                                } else {
+                                    full.rfind('/').unwrap_or(0)
+                                };
+                                url.update_base_pathname(&full[..cut]);
                             } else {
                                 url.clear_pathname();
                                 url.has_opaque_path = true;
@@ -548,6 +601,169 @@ pub fn parse_url(user_input: &str, base: Option<&Url>) -> Option<Url> {
         url.update_unencoded_base_hash(frag);
     }
     Some(url)
+}
+
+// =============================================================================
+// Relative URL fast paths
+// =============================================================================
+
+/// Fast handler for the two most common relative URL patterns:
+///
+/// - `"#fragment"` → clone base, update fragment only
+/// - `"?query[#fragment]"` → clone base, replace query (and optional fragment)
+///
+/// Returns `None` for anything that needs the full state machine (opaque base,
+/// file: scheme, embedded tabs/newlines, other relative patterns, etc.).
+fn try_parse_relative_fast(user_input: &str, base: &Url) -> Option<Url> {
+    let raw = user_input.as_bytes();
+    if raw.is_empty() {
+        return None;
+    }
+
+    // ── Ultra-cheap first-byte gate ───────────────────────────────────────
+    // For the majority of inputs that are NOT '#' or '?' we bail here with
+    // minimal work: one byte read + two comparisons + zero heap traffic.
+    // Leading C0 whitespace is rare; handle it only when necessary.
+    let first = if raw[0] > b' ' {
+        raw[0]
+    } else {
+        raw[raw.iter().position(|&b| b > b' ')?]
+    };
+    if first != b'#' && first != b'?' && first != b'/' {
+        return None;
+    }
+
+    // ── Validate base ─────────────────────────────────────────────────────
+    // Only handles non-opaque, non-file bases.
+    if !base.is_valid || base.has_opaque_path || base.scheme == Scheme::File {
+        return None;
+    }
+
+    // Full C0 trim + tab/newline check (only reached for '#' / '?' inputs)
+    let start = if raw[0] <= b' ' {
+        raw.iter().position(|&b| b > b' ')?
+    } else {
+        0
+    };
+    let end = if raw[raw.len() - 1] <= b' ' {
+        raw.iter().rposition(|&b| b > b' ')? + 1
+    } else {
+        raw.len()
+    };
+    if start >= end {
+        return None;
+    }
+    let t = &raw[start..end];
+
+    // Bail on embedded tabs/newlines — state machine handles those
+    if t.iter().any(|&b| matches!(b, b'\t' | b'\n' | b'\r')) {
+        return None;
+    }
+
+    match t[0] {
+        // ── "#fragment" ───────────────────────────────────────────────────────
+        // Clone the base and update only the fragment.
+        b'#' => {
+            let frag = unsafe { core::str::from_utf8_unchecked(&t[1..]) };
+            let mut url = base.clone();
+            url.update_unencoded_base_hash(frag);
+            Some(url)
+        }
+
+        // ── "?query[#fragment]" ───────────────────────────────────────────────
+        // Clone the base, replace the query (percent-encoded per scheme), and
+        // optionally set a fragment.
+        b'?' => {
+            // Split query from fragment at '#'
+            let (query_bytes, frag_opt) = match t[1..].iter().position(|&b| b == b'#') {
+                Some(p) => (&t[1..1 + p], Some(&t[2 + p..])),
+                None => (&t[1..], None),
+            };
+
+            let mut url = base.clone();
+            url.clear_hash();
+
+            let query_str = unsafe { core::str::from_utf8_unchecked(query_bytes) };
+            let encode_set = if url.is_special() {
+                &crate::character_sets::SPECIAL_QUERY_PERCENT_ENCODE
+            } else {
+                &crate::character_sets::QUERY_PERCENT_ENCODE
+            };
+            url.update_base_search_with_encode(query_str, encode_set);
+
+            if let Some(frag) = frag_opt {
+                let frag_str = unsafe { core::str::from_utf8_unchecked(frag) };
+                url.update_unencoded_base_hash(frag_str);
+            }
+            Some(url)
+        }
+
+        // ── "/abs-path[?query][#fragment]" ───────────────────────────────────
+        // Clone the base authority (scheme + host + port), replace the path,
+        // and optionally set a query and fragment.
+        // Bail if the path needs encoding, contains a backslash, or has
+        // dot-segments — the state machine handles those correctly.
+        b'/' => {
+            // Reject "//" (authority reference) — let state machine handle it
+            if t.len() >= 2 && t[1] == b'/' {
+                return None;
+            }
+            // Only handles non-opaque, non-file special bases
+            if base.scheme == Scheme::File || !base.scheme.is_special() {
+                return None;
+            }
+
+            // Split path / query / fragment
+            let (path_bytes, rest) = match t.iter().position(|&b| b == b'?' || b == b'#') {
+                Some(p) => (&t[..p], &t[p..]),
+                None => (t, b"" as &[u8]),
+            };
+            let (query_opt, frag_opt) = if !rest.is_empty() {
+                if rest[0] == b'?' {
+                    match rest[1..].iter().position(|&b| b == b'#') {
+                        Some(p) => (Some(&rest[1..1 + p]), Some(&rest[2 + p..])),
+                        None => (Some(&rest[1..]), None),
+                    }
+                } else {
+                    (None, Some(&rest[1..]))
+                }
+            } else {
+                (None, None)
+            };
+
+            // Reject if path needs encoding, has backslash, or has dot-segments
+            let path_str = unsafe { core::str::from_utf8_unchecked(path_bytes) };
+            let sig = crate::checkers::path_signature(path_str);
+            if sig & 0x0B != 0 {
+                return None; // needs encoding / backslash / percent
+            }
+            if sig & 0x04 != 0 && path_str.contains("/.") {
+                return None; // actual dot-segment present
+            }
+
+            // Clone base up to (but not including) pathname; set new path.
+            let mut url = base.clone();
+            url.clear_hash();
+            url.clear_search();
+            url.update_base_pathname(path_str);
+
+            if let Some(q) = query_opt {
+                let q_str = unsafe { core::str::from_utf8_unchecked(q) };
+                let encode_set = if url.is_special() {
+                    &crate::character_sets::SPECIAL_QUERY_PERCENT_ENCODE
+                } else {
+                    &crate::character_sets::QUERY_PERCENT_ENCODE
+                };
+                url.update_base_search_with_encode(q_str, encode_set);
+            }
+            if let Some(f) = frag_opt {
+                url.update_unencoded_base_hash(unsafe { core::str::from_utf8_unchecked(f) });
+            }
+            Some(url)
+        }
+
+        _ => None,
+    }
 }
 
 // =============================================================================
@@ -672,9 +888,9 @@ pub(crate) fn try_parse_absolute_fast(raw_input: &str) -> Option<Url> {
     }
 
     // IPv4 quick-filter: check the last *significant* (non-dot) byte of the host.
-    // is_ipv4 strips trailing dots internally, so we mirror that here.
     // For TLD hostnames (.com/.org/.net) the last letter is 'm','g','t' — never
-    // in {0-9, a-f, x} — so is_ipv4 is not called for typical domain names.
+    // in {0-9, a-f, x} — so the IPv4 path is never entered for typical domains.
+    let mut ipv4_val: Option<u32> = None;
     {
         let last_sig = host
             .iter()
@@ -687,7 +903,19 @@ pub(crate) fn try_parse_absolute_fast(raw_input: &str) -> Option<Url> {
         if maybe_ipv4 {
             let host_str = unsafe { core::str::from_utf8_unchecked(host) };
             if crate::checkers::is_ipv4(host_str) {
-                return None;
+                // Try the fast pure-decimal path first (avoids the full parser for
+                // the most common form — "192.168.1.1" etc.)
+                let fast = crate::checkers::try_parse_ipv4_fast(host_str);
+                if fast != u64::MAX {
+                    ipv4_val = Some(fast as u32);
+                } else {
+                    // Non-decimal or non-four-part (e.g. "0x7f.1", "0xc0a80101"):
+                    // full WHATWG parser handles hex/octal/fewer parts.
+                    match crate::checkers::parse_ipv4_address(host_str) {
+                        Some(v) => ipv4_val = Some(v),
+                        None => return None, // malformed — let slow path reject properly
+                    }
+                }
             }
         }
     }
@@ -706,7 +934,9 @@ pub(crate) fn try_parse_absolute_fast(raw_input: &str) -> Option<Url> {
         if port_bytes.is_empty() {
             OMITTED
         } else {
-            if !port_bytes.iter().all(|&c| c.is_ascii_digit()) {
+            // Port must be ≤ 5 digits (max valid port 65535); longer strings
+            // would overflow a u32 in the fold below.
+            if port_bytes.len() > 5 || !port_bytes.iter().all(|&c| c.is_ascii_digit()) {
                 return None;
             }
             let n: u32 = port_bytes
@@ -795,9 +1025,12 @@ pub(crate) fn try_parse_absolute_fast(raw_input: &str) -> Option<Url> {
         frag_start.map(|fs| unsafe { core::str::from_utf8_unchecked(&b[fs + 1..]) });
 
     // ── Build URL buffer in a single forward write pass ────────────────────
-    let total = colon + 1 + 2 // scheme:   //
-        + host.len()
-        + if port_val != OMITTED { 6 } else { 0 }  // :NNNNN
+    // For IPv4 hosts the canonical form is at most 15 chars ("255.255.255.255"),
+    // which may differ from the raw input (e.g. "0x7f.1" → "127.0.0.1").
+    let host_len_est = if ipv4_val.is_some() { 15 } else { host.len() };
+    let total = colon + 1 + 2 // scheme://
+        + host_len_est
+        + if port_val != OMITTED { 6 } else { 0 }
         + (path_end - path_start).max(1)
         + query_start.map_or(0, |qs| query_end - qs)
         + fragment.map_or(0, |f| f.len() + 1);
@@ -819,9 +1052,15 @@ pub(crate) fn try_parse_absolute_fast(raw_input: &str) -> Option<Url> {
     url.components.username_end = url.buffer.len() as u32;
     url.components.host_start = url.buffer.len() as u32;
 
-    // Host (already validated: lowercase ASCII, no forbidden chars)
-    url.buffer
-        .push_str(unsafe { core::str::from_utf8_unchecked(host) });
+    // Host — normalise IPv4 to dotted-decimal, or write domain as-is
+    if let Some(v4) = ipv4_val {
+        crate::serializers::write_ipv4(&mut url.buffer, v4);
+        url.host_kind = HostKind::Ipv4;
+    } else {
+        url.buffer
+            .push_str(unsafe { core::str::from_utf8_unchecked(host) });
+        url.host_kind = HostKind::Domain;
+    }
     url.components.host_end = url.buffer.len() as u32;
 
     // Port
@@ -868,7 +1107,6 @@ pub(crate) fn try_parse_absolute_fast(raw_input: &str) -> Option<Url> {
         url.buffer.push_str(&enc);
     }
 
-    url.host_kind = HostKind::Domain;
     Some(url)
 }
 
@@ -1007,7 +1245,7 @@ pub(crate) fn try_validate_absolute_fast(raw_input: &str) -> Option<()> {
     if let Some(pc) = port_colon {
         let port_bytes = &b[pc + 1..auth_end];
         if !port_bytes.is_empty() {
-            if !port_bytes.iter().all(|&c| c.is_ascii_digit()) {
+            if port_bytes.len() > 5 || !port_bytes.iter().all(|&c| c.is_ascii_digit()) {
                 return None;
             }
             let n: u32 = port_bytes

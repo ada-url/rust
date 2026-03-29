@@ -18,6 +18,35 @@ pub fn ipv4(address: u64) -> String {
     format_ipv4(a, b, c, d)
 }
 
+/// Write a packed 32-bit IPv4 address in dotted-decimal directly into `buf`.
+///
+/// Avoids allocating a temporary `String`; useful in hot paths where the
+/// address is being appended to an already-allocated URL buffer.
+#[inline]
+pub fn write_ipv4(buf: &mut String, address: u32) {
+    write_octet(buf, (address >> 24) as u8);
+    buf.push('.');
+    write_octet(buf, (address >> 16) as u8);
+    buf.push('.');
+    write_octet(buf, (address >> 8) as u8);
+    buf.push('.');
+    write_octet(buf, address as u8);
+}
+
+#[inline]
+fn write_octet(buf: &mut String, v: u8) {
+    if v >= 100 {
+        buf.push((b'0' + v / 100) as char);
+        buf.push((b'0' + (v / 10) % 10) as char);
+        buf.push((b'0' + v % 10) as char);
+    } else if v >= 10 {
+        buf.push((b'0' + v / 10) as char);
+        buf.push((b'0' + v % 10) as char);
+    } else {
+        buf.push((b'0' + v) as char);
+    }
+}
+
 #[cfg(feature = "std")]
 fn format_ipv4(a: u8, b: u8, c: u8, d: u8) -> String {
     std::format!("{}.{}.{}.{}", a, b, c, d)

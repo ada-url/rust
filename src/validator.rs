@@ -94,6 +94,104 @@ fn validate_absolute_raw(b: &[u8]) -> bool {
         return false;
     }
 
+    // Fast path (overwhelmingly common): no tabs/newlines anywhere in the URL.
+    // Bypasses all SkipSpecial overhead — every scan is a plain iterator or
+    // index operation with no per-byte branching on special characters.
+    if !b.iter().any(|&c| matches!(c, b'\t' | b'\n' | b'\r')) {
+        return validate_clean_url(b);
+    }
+
+    // Slow path: URL contains embedded tabs/newlines — use SkipSpecial to
+    // filter them inline without allocating.
+    validate_url_with_specials(b)
+}
+
+/// Validate an absolute URL that is known to contain no `\t`, `\n`, or `\r`.
+/// All scans are plain iterator / index operations with no filtering overhead.
+#[inline]
+fn validate_clean_url(b: &[u8]) -> bool {
+    if !is_alpha(b[0]) {
+        return false;
+    }
+
+    // Scheme: alpha start, alnum/+/-/. chars, terminated by ':'
+    let scheme_end = match b.iter().position(|&c| !is_alnum_plus(c)) {
+        Some(p) if b[p] == b':' => p,
+        _ => return false,
+    };
+
+    // Classify scheme — all special schemes are ≤ 5 chars
+    let scheme_type = if scheme_end <= 5 {
+        let mut lo = [0u8; 5];
+        for (i, &c) in b[..scheme_end].iter().enumerate() {
+            lo[i] = c | 0x20;
+        }
+        let s = unsafe { core::str::from_utf8_unchecked(&lo[..scheme_end]) };
+        get_scheme_type(s)
+    } else {
+        SchemeType::NotSpecial
+    };
+
+    // Strip fragment (parser handles it; always structurally valid)
+    let rest_start = scheme_end + 1;
+    let rest_end = b[rest_start..]
+        .iter()
+        .position(|&c| c == b'#')
+        .map(|p| rest_start + p)
+        .unwrap_or(b.len());
+    let rest = &b[rest_start..rest_end];
+
+    match scheme_type {
+        SchemeType::File => {
+            // file: authority is optional; validate it when "//" or "\\" is present
+            let n = skip_slashes(rest);
+            if n > 0 {
+                validate_auth_clean(&rest[n..], false)
+            } else {
+                true
+            }
+        }
+        s if s.is_special() => {
+            let n = skip_slashes(rest);
+            validate_auth_clean(&rest[n..], true)
+        }
+        _ => {
+            // Non-special: authority only when "//" prefix is present
+            if rest.len() >= 2 && rest[0] == b'/' && rest[1] == b'/' {
+                validate_auth_clean(&rest[2..], false)
+            } else {
+                true // opaque path — always valid structurally
+            }
+        }
+    }
+}
+
+#[inline]
+fn skip_slashes(b: &[u8]) -> usize {
+    let mut i = 0;
+    while i < b.len() && (b[i] == b'/' || b[i] == b'\\') {
+        i += 1;
+    }
+    i
+}
+
+#[inline]
+fn validate_auth_clean(rest: &[u8], is_special: bool) -> bool {
+    let auth_end = rest
+        .iter()
+        .position(|&c| c == b'/' || (is_special && c == b'\\') || c == b'?')
+        .unwrap_or(rest.len());
+    let authority = &rest[..auth_end];
+    let host_port = match authority.iter().rposition(|&c| c == b'@') {
+        Some(at) => &authority[at + 1..],
+        None => authority,
+    };
+    validate_hp(host_port, is_special)
+}
+
+/// Validate a URL that contains embedded `\t`, `\n`, or `\r` — uses
+/// `SkipSpecial` to filter them inline without heap allocation.
+fn validate_url_with_specials(b: &[u8]) -> bool {
     let mut src = SkipSpecial::new(b);
 
     // Scheme: must start with alpha, then alnum/+/-/., terminated by ':'
@@ -102,8 +200,11 @@ fn validate_absolute_raw(b: &[u8]) -> bool {
         return false;
     }
 
-    #[allow(unused_assignments)]
-    let mut scheme_end_in_b = 0usize;
+    // Single-pass scheme scan: build lower-case classification buffer while
+    // counting significant chars — no separate count() or filter pass.
+    let mut scheme_lower = [0u8; 5];
+    let mut scheme_len = 0usize;
+
     loop {
         let p = src.peek_pos();
         if p >= b.len() {
@@ -111,46 +212,29 @@ fn validate_absolute_raw(b: &[u8]) -> bool {
         }
         let c = b[p];
         if c == b':' {
-            scheme_end_in_b = p;
             src.advance_past(p);
             break;
         }
         if !is_alnum_plus(c) {
             return false;
         }
+        if scheme_len < 5 {
+            scheme_lower[scheme_len] = c | 0x20;
+        }
+        scheme_len += 1;
         src.advance_past(p);
     }
 
-    // Lowercase scheme into a small stack buffer for special-scheme classification.
-    // All special schemes (http, https, ftp, ws, wss, file) are ≤5 significant
-    // chars. Schemes longer than that are definitively non-special — skip the copy.
-    let raw_scheme = &b[..scheme_end_in_b];
-    let scheme_type = {
-        let significant_len = raw_scheme
-            .iter()
-            .filter(|&&c| !matches!(c, b'\t' | b'\n' | b'\r'))
-            .count();
-        if significant_len <= 5 {
-            let mut scheme_lower = [0u8; 5];
-            let mut scheme_len = 0usize;
-            for &c in raw_scheme
-                .iter()
-                .filter(|&&c| !matches!(c, b'\t' | b'\n' | b'\r'))
-            {
-                scheme_lower[scheme_len] = c | 0x20;
-                scheme_len += 1;
-            }
-            let scheme_str = unsafe { core::str::from_utf8_unchecked(&scheme_lower[..scheme_len]) };
-            get_scheme_type(scheme_str)
-        } else {
-            SchemeType::NotSpecial
-        }
+    let scheme_type = if scheme_len <= 5 {
+        let scheme_str = unsafe { core::str::from_utf8_unchecked(&scheme_lower[..scheme_len]) };
+        get_scheme_type(scheme_str)
+    } else {
+        SchemeType::NotSpecial
     };
 
     // Rest = everything after ':'
     let rest_start = src.peek_pos();
 
-    // Find '#' in remaining bytes (fragment is always valid, stop there)
     let rest_end = b[rest_start..]
         .iter()
         .position(|&c| c == b'#')
@@ -246,9 +330,17 @@ fn validate_authority_and_rest_raw(rest: &[u8], is_special: bool) -> bool {
 // ============================================================
 
 fn validate_host_and_port_raw(host_port: &[u8], is_special: bool) -> bool {
-    // Filter out tabs/newlines first (stack — no heap).
-    // Since host_port is typically very short (≤ 253 bytes), a 256-byte stack
-    // buffer covers virtually all realistic inputs.
+    // Fast path (overwhelmingly common): no tabs/newlines present.
+    // Validate directly on the original slice — zero copies, zero stack writes.
+    if !host_port
+        .iter()
+        .any(|&c| matches!(c, b'\t' | b'\n' | b'\r'))
+    {
+        return validate_hp(host_port, is_special);
+    }
+
+    // Rare path: strip tabs/newlines into a small stack buffer, then validate.
+    // Host_port is at most 253 bytes (DNS limit) + port, so 256 covers everything.
     let mut buf = [0u8; 256];
     let mut len = 0usize;
     for &c in host_port {
@@ -256,13 +348,17 @@ fn validate_host_and_port_raw(host_port: &[u8], is_special: bool) -> bool {
             continue;
         }
         if len >= 256 {
-            return false; // pathologically long host — invalid
+            return false; // pathologically long — invalid
         }
         buf[len] = c;
         len += 1;
     }
-    let hp = &buf[..len];
+    validate_hp(&buf[..len], is_special)
+}
 
+/// Validate an already-clean (no tabs/newlines) host[:port] slice.
+#[inline]
+fn validate_hp(hp: &[u8], is_special: bool) -> bool {
     if hp.is_empty() {
         return !is_special;
     }

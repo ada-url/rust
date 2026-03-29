@@ -176,6 +176,106 @@ pub fn path_signature(input: &str) -> u8 {
     }
 }
 
+/// Full WHATWG IPv4 address parser — handles decimal, octal (leading 0),
+/// hex (0x/0X), and 1–4 dot-separated parts (e.g. "127.1", "0xc0a80101").
+///
+/// Returns `Some(packed_u32)` on success, `None` for invalid input.
+/// This is used by `try_parse_absolute_fast` to normalise IPv4 addresses in-place.
+pub fn parse_ipv4_address(input: &str) -> Option<u32> {
+    let input = input.trim_end_matches('.');
+    if input.is_empty() {
+        return None;
+    }
+    let mut parts = 0usize; // dot-separated parts consumed so far
+    let mut ipv4: u64 = 0;
+    let mut rem = input;
+
+    loop {
+        if parts >= 4 || rem.is_empty() {
+            break;
+        }
+        let b = rem.as_bytes();
+
+        // Determine radix and parse one part
+        let (val, consumed) = if b.len() >= 2 && b[0] == b'0' && (b[1] == b'x' || b[1] == b'X') {
+            // Hexadecimal
+            if b.len() == 2 || b[2] == b'.' {
+                (0u64, 2usize)
+            } else {
+                let (v, c) = parse_uint_raw(&rem[2..], 16)?;
+                (v, 2 + c)
+            }
+        } else if b[0] == b'0' && b.len() > 1 && b[1] >= b'0' && b[1] <= b'9' {
+            // Octal
+            let (v, c) = parse_uint_raw(&rem[1..], 8)?;
+            (v, 1 + c)
+        } else {
+            // Decimal
+            parse_uint_raw(rem, 10)?
+        };
+
+        rem = &rem[consumed..];
+
+        if rem.is_empty() {
+            // Final (possibly multi-octet) part
+            let bits = 32u32.wrapping_sub(parts as u32 * 8);
+            let max = if bits >= 64 { u64::MAX } else { 1u64 << bits };
+            if val >= max {
+                return None; // overflow
+            }
+            ipv4 = (ipv4 << bits) | val;
+            parts += 1;
+            break;
+        } else {
+            // Intermediate part — must be a single octet ≤ 255 followed by '.'
+            if val > 255 || rem.as_bytes()[0] != b'.' {
+                return None;
+            }
+            ipv4 = (ipv4 << 8) | val;
+            rem = &rem[1..]; // skip '.'
+            parts += 1;
+        }
+    }
+
+    if !rem.is_empty() || parts == 0 {
+        return None;
+    }
+    Some(ipv4 as u32)
+}
+
+/// Parse an unsigned integer of the given radix from the start of `s`.
+/// Returns `(value, bytes_consumed)` or `None` if no digits were found.
+#[inline]
+fn parse_uint_raw(s: &str, radix: u64) -> Option<(u64, usize)> {
+    let b = s.as_bytes();
+    if b.is_empty() {
+        return None;
+    }
+    let mut v = 0u64;
+    let mut c = 0usize;
+    for &byte in b {
+        let d = match radix {
+            16 => match byte {
+                b'0'..=b'9' => (byte - b'0') as u64,
+                b'a'..=b'f' => (byte - b'a' + 10) as u64,
+                b'A'..=b'F' => (byte - b'A' + 10) as u64,
+                _ => break,
+            },
+            8 => match byte {
+                b'0'..=b'7' => (byte - b'0') as u64,
+                _ => break,
+            },
+            _ => match byte {
+                b'0'..=b'9' => (byte - b'0') as u64,
+                _ => break,
+            },
+        };
+        v = v.checked_mul(radix)?.checked_add(d)?;
+        c += 1;
+    }
+    if c == 0 { None } else { Some((v, c)) }
+}
+
 /// Check that the domain name length and label lengths are within DNS limits.
 pub fn verify_dns_length(input: &str) -> bool {
     let s = input.strip_suffix('.').unwrap_or(input);
