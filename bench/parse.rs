@@ -1,5 +1,9 @@
-use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use std::hint::black_box;
+use ada_url::Url;
 
+/// Realistic URL examples collected on the actual web.
+/// Matches the url_examples_default array in bench.cpp.
 const URLS: &[&str] = &[
     "https://www.google.com/webhp?hl=en&amp;ictx=2&amp;sa=X&amp;ved=0ahUKEwil_oSxzJj8AhVtEFkFHTHnCGQQPQgI",
     "https://support.google.com/websearch/?p=ws_results_help&amp;hl=en-CA&amp;fg=1",
@@ -14,39 +18,56 @@ const URLS: &[&str] = &[
     "http://[2606:4700:4700::1111]", // ipv6
 ];
 
-pub fn parse_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("parse");
-    group.throughput(Throughput::Bytes(URLS.iter().map(|u| u.len() as u64).sum()));
+fn total_bytes() -> u64 {
+    URLS.iter().map(|u| u.len() as u64).sum()
+}
+
+/// Parse URLs and get href — matches BasicBench_AdaURL_href in bench.cpp.
+pub fn basic_bench_ada_url_href(c: &mut Criterion) {
+    let mut group = c.benchmark_group("BasicBench_AdaURL_href");
+    group.throughput(Throughput::Bytes(total_bytes()));
     group.bench_function("ada_url", |b| {
         b.iter(|| {
-            URLS.iter().for_each(|url| {
-                ada_url::Url::try_from(*black_box(url)).unwrap();
-            })
+            let mut href_size = 0usize;
+            for &url in URLS {
+                if let Ok(parsed) = Url::parse(black_box(url), None) {
+                    href_size += parsed.href().len();
+                }
+            }
+            black_box(href_size)
         })
     });
     group.bench_function("url", |b| {
         b.iter(|| {
-            URLS.iter().for_each(|url| {
-                black_box(url).parse::<url::Url>().unwrap();
-            })
+            let mut href_size = 0usize;
+            for &url in URLS {
+                if let Ok(parsed) = black_box(url).parse::<url::Url>() {
+                    href_size += parsed.as_str().len();
+                }
+            }
+            black_box(href_size)
         })
     });
     group.finish();
 }
 
-pub fn can_parse_benchmark(c: &mut Criterion) {
-    let mut group = c.benchmark_group("can_parse");
-    group.throughput(Throughput::Bytes(URLS.iter().map(|u| u.len() as u64).sum()));
+/// Check if URLs can be parsed — matches BasicBench_AdaURL_CanParse in bench.cpp.
+pub fn basic_bench_ada_url_can_parse(c: &mut Criterion) {
+    let mut group = c.benchmark_group("BasicBench_AdaURL_CanParse");
+    group.throughput(Throughput::Bytes(total_bytes()));
     group.bench_function("ada_url", |b| {
         b.iter(|| {
-            URLS.iter().for_each(|url| {
-                let _ = ada_url::Url::can_parse(*black_box(url), None);
-            })
+            let mut success = 0usize;
+            for &url in URLS {
+                if Url::can_parse(black_box(url), None) {
+                    success += 1;
+                }
+            }
+            black_box(success)
         })
     });
-    // TODO: Add `url` crate when it supports can_parse function.
     group.finish();
 }
 
-criterion_group!(benches, parse_benchmark, can_parse_benchmark);
+criterion_group!(benches, basic_bench_ada_url_href, basic_bench_ada_url_can_parse);
 criterion_main!(benches);
