@@ -115,7 +115,7 @@ pub fn is_ipv4(input: &str) -> bool {
 ///   bit 1 (0x02) – backslash `\`
 ///   bit 2 (0x04) – dot `.`
 ///   bit 3 (0x08) – percent `%`
-const PATH_SIG_TABLE: [u8; 256] = {
+pub(crate) const PATH_SIG_TABLE: [u8; 256] = {
     let mut t = [0u8; 256];
     // Needs encoding: C0 controls (0x00-0x1F), DEL (0x7F), high bytes (0x80-0xFF)
     let mut i = 0usize;
@@ -147,26 +147,33 @@ const PATH_SIG_TABLE: [u8; 256] = {
 ///
 /// Ada C++ uses `for (; i + 7 < size; i += 8)` — we match that exactly.
 pub fn path_signature(input: &str) -> u8 {
-    let b = input.as_bytes();
-    let mut acc = 0u8;
-    let mut i = 0;
-    // 8-at-a-time — Ada C++ uses this exact unroll factor
-    while i + 8 <= b.len() {
-        acc |= PATH_SIG_TABLE[b[i] as usize]
-            | PATH_SIG_TABLE[b[i + 1] as usize]
-            | PATH_SIG_TABLE[b[i + 2] as usize]
-            | PATH_SIG_TABLE[b[i + 3] as usize]
-            | PATH_SIG_TABLE[b[i + 4] as usize]
-            | PATH_SIG_TABLE[b[i + 5] as usize]
-            | PATH_SIG_TABLE[b[i + 6] as usize]
-            | PATH_SIG_TABLE[b[i + 7] as usize];
-        i += 8;
+    #[cfg(feature = "nightly-simd")]
+    {
+        return crate::portable_simd_impl::path_signature(input);
     }
-    while i < b.len() {
-        acc |= PATH_SIG_TABLE[b[i] as usize];
-        i += 1;
+    #[cfg(not(feature = "nightly-simd"))]
+    {
+        let b = input.as_bytes();
+        let mut acc = 0u8;
+        let mut i = 0;
+        // 8-at-a-time — Ada C++ uses this exact unroll factor
+        while i + 8 <= b.len() {
+            acc |= PATH_SIG_TABLE[b[i] as usize]
+                | PATH_SIG_TABLE[b[i + 1] as usize]
+                | PATH_SIG_TABLE[b[i + 2] as usize]
+                | PATH_SIG_TABLE[b[i + 3] as usize]
+                | PATH_SIG_TABLE[b[i + 4] as usize]
+                | PATH_SIG_TABLE[b[i + 5] as usize]
+                | PATH_SIG_TABLE[b[i + 6] as usize]
+                | PATH_SIG_TABLE[b[i + 7] as usize];
+            i += 8;
+        }
+        while i < b.len() {
+            acc |= PATH_SIG_TABLE[b[i] as usize];
+            i += 1;
+        }
+        acc
     }
-    acc
 }
 
 /// Check that the domain name length and label lengths are within DNS limits.

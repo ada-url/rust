@@ -30,8 +30,6 @@ pub const fn is_tabs_or_newline(c: u8) -> bool {
 #[inline]
 #[allow(dead_code)]
 pub fn has_tabs_or_newline(s: &str) -> bool {
-    #[cfg(feature = "simd")]
-    return crate::simd::has_tabs_or_newline(s.as_bytes());
     #[allow(unreachable_code)]
     s.bytes().any(is_tabs_or_newline)
 }
@@ -153,24 +151,29 @@ pub fn contains_forbidden_domain_code_point(s: &[u8]) -> bool {
 /// Returns a flags byte with no branches:
 ///   bit 0 → at least one forbidden domain code point  
 ///   bit 1 → at least one ASCII uppercase letter
-///
-/// Uses the combined `DOMAIN_CHECK` table and an unrolled 4-at-a-time loop.
 #[inline]
 pub fn contains_forbidden_domain_code_point_or_upper(s: &[u8]) -> u8 {
-    let mut acc = 0u8;
-    let mut i = 0;
-    while i + 4 <= s.len() {
-        acc |= DOMAIN_CHECK[s[i] as usize]
-            | DOMAIN_CHECK[s[i + 1] as usize]
-            | DOMAIN_CHECK[s[i + 2] as usize]
-            | DOMAIN_CHECK[s[i + 3] as usize];
-        i += 4;
+    #[cfg(feature = "nightly-simd")]
+    {
+        return crate::portable_simd_impl::contains_forbidden_domain_code_point_or_upper(s);
     }
-    while i < s.len() {
-        acc |= DOMAIN_CHECK[s[i] as usize];
-        i += 1;
+    #[cfg(not(feature = "nightly-simd"))]
+    {
+        let mut acc = 0u8;
+        let mut i = 0;
+        while i + 4 <= s.len() {
+            acc |= DOMAIN_CHECK[s[i] as usize]
+                | DOMAIN_CHECK[s[i + 1] as usize]
+                | DOMAIN_CHECK[s[i + 2] as usize]
+                | DOMAIN_CHECK[s[i + 3] as usize];
+            i += 4;
+        }
+        while i < s.len() {
+            acc |= DOMAIN_CHECK[s[i] as usize];
+            i += 1;
+        }
+        acc
     }
-    acc
 }
 
 // ---------------------------------------------------------------------------
@@ -182,20 +185,41 @@ pub fn contains_forbidden_domain_code_point_or_upper(s: &[u8]) -> u8 {
 /// With the `simd` feature uses Ada's SWAR `ascii_map` technique (8 bytes/iter).
 #[inline]
 pub fn to_lower_ascii(buf: &mut [u8]) -> bool {
-    #[cfg(feature = "simd")]
-    return crate::simd::to_lower_ascii(buf);
+    #[cfg(feature = "nightly-simd")]
+    return crate::portable_simd_impl::to_lower_ascii(buf);
 
-    #[allow(unreachable_code)]
+    // SWAR (SIMD Within A Register): Ada C++ `ascii_map` formula, 8 bytes/iter.
+    // Always faster than byte-by-byte on all platforms; no feature flag needed.
+    #[cfg(not(feature = "nightly-simd"))]
     {
-        let mut all_ascii = true;
-        for b in buf.iter_mut() {
-            if *b >= b'A' && *b <= b'Z' {
-                *b |= 0x20;
-            } else if *b >= 0x80 {
-                all_ascii = false;
-            }
+        const M80: u64 = 0x8080_8080_8080_8080;
+        const AP: u64 = 0x3f3f_3f3f_3f3f_3f3f; // broadcast(128-b'A')=63
+        const ZP: u64 = 0x2525_2525_2525_2525; // broadcast(128-b'Z'-1)=37
+        let n = buf.len();
+        let ptr = buf.as_mut_ptr();
+        let mut non_ascii: u64 = 0;
+        let mut i = 0usize;
+        while i + 8 <= n {
+            let mut w: u64 = 0;
+            unsafe { core::ptr::copy_nonoverlapping(ptr.add(i), &mut w as *mut u64 as *mut u8, 8) };
+            non_ascii |= w & M80;
+            w ^= (((w.wrapping_add(AP)) ^ (w.wrapping_add(ZP))) & M80) >> 2;
+            unsafe { core::ptr::copy_nonoverlapping(&w as *const u64 as *const u8, ptr.add(i), 8) };
+            i += 8;
         }
-        all_ascii
+        if i < n {
+            let rem = n - i;
+            let mut w: u64 = 0;
+            unsafe {
+                core::ptr::copy_nonoverlapping(ptr.add(i), &mut w as *mut u64 as *mut u8, rem)
+            };
+            non_ascii |= w & M80;
+            w ^= (((w.wrapping_add(AP)) ^ (w.wrapping_add(ZP))) & M80) >> 2;
+            unsafe {
+                core::ptr::copy_nonoverlapping(&w as *const u64 as *const u8, ptr.add(i), rem)
+            };
+        }
+        non_ascii == 0
     }
 }
 
@@ -255,6 +279,13 @@ pub fn percent_decode(input: &str, first_percent: usize) -> String {
 /// Returns `input.len()` when no encoding is required.
 #[inline]
 pub fn percent_encode_index(input: &str, character_set: &[u8; 32]) -> usize {
+    // When nightly-simd is available, delegate to specialised SIMD variants
+    // for the three hottest character sets; fall through to generic for others.
+    // The scalar bit-table lookup is already extremely fast (1 array index + 1 bit test
+    // per byte).  The nightly-simd generic version adds function-call overhead without
+    // measurably helping for the short strings common in URL parsing.
+    // Specialised callers (update_base_search_with_encode) call the SIMD variants
+    // from portable_simd_impl directly when nightly-simd is enabled.
     input
         .as_bytes()
         .iter()

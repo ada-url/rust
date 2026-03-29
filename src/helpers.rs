@@ -34,11 +34,52 @@ use crate::unicode::{
 /// U+200D ZERO WIDTH JOINER, whose low byte is 0x0D) are never removed.
 #[inline]
 pub fn strip_tabs_newlines(s: &str) -> Cow<'_, str> {
-    // Fast presence check — SIMD-accelerated when the `simd` feature is on.
-    #[cfg(feature = "simd")]
-    let has_special = crate::simd::has_tabs_or_newline(s.as_bytes());
-    #[cfg(not(feature = "simd"))]
-    let has_special = s.bytes().any(|b| matches!(b, b'\t' | b'\n' | b'\r'));
+    // Fast presence check.
+    // nightly-simd: portable SIMD (16 bytes/iter via std::simd)
+    // otherwise: SWAR — 8 bytes/iter using u64 broadcast/xor, zero overhead
+    #[cfg(feature = "nightly-simd")]
+    let has_special = crate::portable_simd_impl::has_tabs_or_newline(s.as_bytes());
+    #[cfg(not(feature = "nightly-simd"))]
+    let has_special = {
+        // SWAR: process 8 bytes at a time
+        #[inline(always)]
+        const fn bcast(v: u8) -> u64 {
+            (v as u64).wrapping_mul(0x0101_0101_0101_0101)
+        }
+        #[inline(always)]
+        const fn has_zero(w: u64) -> u64 {
+            w.wrapping_sub(0x0101_0101_0101_0101) & !w & 0x8080_8080_8080_8080
+        }
+        let b = s.as_bytes();
+        let (cr, lf, ht) = (bcast(b'\r'), bcast(b'\n'), bcast(b'\t'));
+        let n = b.len();
+        let mut running: u64 = 0;
+        let mut i = 0;
+        while i + 8 <= n {
+            let mut w: u64 = 0;
+            unsafe {
+                core::ptr::copy_nonoverlapping(b.as_ptr().add(i), &mut w as *mut u64 as *mut u8, 8)
+            };
+            running |= has_zero(w ^ cr) | has_zero(w ^ lf) | has_zero(w ^ ht);
+            i += 8;
+        }
+        if running != 0 {
+            true
+        } else {
+            if i < n {
+                let mut w: u64 = 0;
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        b.as_ptr().add(i),
+                        &mut w as *mut u64 as *mut u8,
+                        n - i,
+                    )
+                };
+                running |= has_zero(w ^ cr) | has_zero(w ^ lf) | has_zero(w ^ ht);
+            }
+            running != 0
+        }
+    };
     if !has_special {
         return Cow::Borrowed(s); // zero allocation — common path
     }
@@ -111,8 +152,8 @@ pub fn shorten_path(path: &mut String, scheme_type: SchemeType) -> bool {
 /// Next authority delimiter for special URLs: `@`, `/`, `\`, `?`
 #[inline]
 pub fn find_authority_delimiter_special(view: &str) -> usize {
-    #[cfg(feature = "simd")]
-    return crate::simd::find_authority_delimiter_special(view);
+    #[cfg(feature = "nightly-simd")]
+    return crate::portable_simd_impl::find_authority_delimiter_special(view);
     #[allow(unreachable_code)]
     view.bytes()
         .position(|b| matches!(b, b'@' | b'/' | b'\\' | b'?'))
@@ -122,8 +163,8 @@ pub fn find_authority_delimiter_special(view: &str) -> usize {
 /// Next authority delimiter for non-special URLs: `@`, `/`, `?`
 #[inline]
 pub fn find_authority_delimiter(view: &str) -> usize {
-    #[cfg(feature = "simd")]
-    return crate::simd::find_authority_delimiter(view);
+    #[cfg(feature = "nightly-simd")]
+    return crate::portable_simd_impl::find_authority_delimiter(view);
     #[allow(unreachable_code)]
     view.bytes()
         .position(|b| matches!(b, b'@' | b'/' | b'?'))
@@ -136,8 +177,8 @@ pub fn find_authority_delimiter(view: &str) -> usize {
 
 #[inline]
 fn find_next_host_delimiter_special(view: &str, from: usize) -> usize {
-    #[cfg(feature = "simd")]
-    return crate::simd::find_next_host_delimiter_special(view, from);
+    #[cfg(feature = "nightly-simd")]
+    return crate::portable_simd_impl::find_next_host_delimiter_special(view, from);
     #[allow(unreachable_code)]
     view.as_bytes()[from..]
         .iter()
@@ -148,8 +189,8 @@ fn find_next_host_delimiter_special(view: &str, from: usize) -> usize {
 
 #[inline]
 fn find_next_host_delimiter(view: &str, from: usize) -> usize {
-    #[cfg(feature = "simd")]
-    return crate::simd::find_next_host_delimiter(view, from);
+    #[cfg(feature = "nightly-simd")]
+    return crate::portable_simd_impl::find_next_host_delimiter(view, from);
     #[allow(unreachable_code)]
     view.as_bytes()[from..]
         .iter()

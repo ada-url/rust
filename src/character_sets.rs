@@ -44,7 +44,7 @@ pub const HEX: &[u8; 1023] = b"%00\0%01\0%02\0%03\0%04\0%05\0%06\0%07\0\
 // Character set: C0 control percent-encode
 // Encodes: U+0000–U+001F, U+007F, and U+0080–U+FFFF
 // ---------------------------------------------------------------------------
-pub const C0_CONTROL_PERCENT_ENCODE: [u8; 32] = [
+pub static C0_CONTROL_PERCENT_ENCODE: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, // 0x00–0x1F
     0x00, 0x00, 0x00, 0x00, // 0x20–0x3F
     0x00, 0x00, 0x00, 0x00, // 0x40–0x5F
@@ -60,7 +60,7 @@ pub const C0_CONTROL_PERCENT_ENCODE: [u8; 32] = [
 // Encodes C0-control, space (0x20), " (0x22), < (0x3C), > (0x3E),
 //   ` (0x60), and everything >= 0x7F
 // ---------------------------------------------------------------------------
-pub const FRAGMENT_PERCENT_ENCODE: [u8; 32] = [
+pub static FRAGMENT_PERCENT_ENCODE: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, // 0x00–0x1F
     0x05, 0x00, 0x00, 0x50, // 0x20–0x3F: 0x05=space+", 0x50=<+>
     0x00, 0x00, 0x00, 0x00, // 0x40–0x5F
@@ -76,7 +76,7 @@ pub const FRAGMENT_PERCENT_ENCODE: [u8; 32] = [
 // Encodes C0-control, space, ", #, <, >, and everything >= 0x7F
 // NOTE: backtick (0x60) is NOT encoded here (only in fragment and path sets).
 // ---------------------------------------------------------------------------
-pub const QUERY_PERCENT_ENCODE: [u8; 32] = [
+pub static QUERY_PERCENT_ENCODE: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, // 0x00–0x1F
     0x0D, 0x00, 0x00, 0x50, // 0x20–0x3F: 0x0D=space+"+#, 0x50=<+>
     0x00, 0x00, 0x00, 0x00, // 0x40–0x5F
@@ -91,7 +91,7 @@ pub const QUERY_PERCENT_ENCODE: [u8; 32] = [
 // Character set: special-query percent-encode
 // Same as query but also encodes ' (0x27)
 // ---------------------------------------------------------------------------
-pub const SPECIAL_QUERY_PERCENT_ENCODE: [u8; 32] = [
+pub static SPECIAL_QUERY_PERCENT_ENCODE: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, // 0x00–0x1F
     0x8D, 0x00, 0x00, 0x50, // 0x20–0x3F: 0x8D=space+"+#+', 0x50=<+>
     0x00, 0x00, 0x00, 0x00, // 0x40–0x5F
@@ -106,7 +106,7 @@ pub const SPECIAL_QUERY_PERCENT_ENCODE: [u8; 32] = [
 // Character set: path percent-encode
 // Encodes C0-control, space, ", #, <, >, ?, ^, `, {, |, }, DEL, >= 0x80
 // ---------------------------------------------------------------------------
-pub const PATH_PERCENT_ENCODE: [u8; 32] = [
+pub static PATH_PERCENT_ENCODE: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, // 0x00–0x1F
     0x0D, 0x00, 0x00, 0xD0, // 0x20–0x3F: space+"+# and <+>+?
     0x00, 0x00, 0x00, 0x40, // 0x40–0x5F: ^ (0x5E)
@@ -122,7 +122,7 @@ pub const PATH_PERCENT_ENCODE: [u8; 32] = [
 // Encodes C0-control, space, ", #, /, :, ;, <, =, >, ?, @, [, \, ], ^,
 //   `, {, |, }, DEL, and >= 0x80
 // ---------------------------------------------------------------------------
-pub const USERINFO_PERCENT_ENCODE: [u8; 32] = [
+pub static USERINFO_PERCENT_ENCODE: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, // 0x00–0x1F
     0x0D, 0x80, 0x00, 0xFC, // 0x20–0x3F: space+"+#+ /  and :;<=>?
     0x01, 0x00, 0x00, 0x78, // 0x40–0x5F: @  and [,\,],^
@@ -137,7 +137,7 @@ pub const USERINFO_PERCENT_ENCODE: [u8; 32] = [
 // Character set: application/x-www-form-urlencoded percent-encode
 // Like userinfo but space is NOT encoded (it becomes '+' separately)
 // ---------------------------------------------------------------------------
-pub const WWW_FORM_URLENCODED_PERCENT_ENCODE: [u8; 32] = [
+pub static WWW_FORM_URLENCODED_PERCENT_ENCODE: [u8; 32] = [
     0xFF, 0xFF, 0xFF, 0xFF, // 0x00–0x1F
     0xFE, 0x9B, 0x00, 0xFC, // 0x20–0x3F: (not space) !"#$%&'  ()+,/  :;<=>?
     0x01, 0x00, 0x00, 0x78, // 0x40–0x5F: @  and [,\,],^

@@ -53,8 +53,8 @@ default = ["std"]
 serde = ["dep:serde", "std"]
 # enable allocations
 std = []
-# enable SIMD/SWAR optimizations for hot scanning paths
-simd = []
+# nightly-only: portable_simd (std::simd) — generates optimal SIMD for any target
+nightly-simd = []
 
 [dependencies]
 serde = { version = "1", optional = true, features = ["derive"] }

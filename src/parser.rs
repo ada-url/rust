@@ -1,5 +1,5 @@
 //! WHATWG URL parser state machine.
-//! https://url.spec.whatwg.org/#concept-url-parser
+//! <https://url.spec.whatwg.org/#concept-url-parser>
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
@@ -888,7 +888,7 @@ pub(crate) fn try_parse_absolute_fast(raw_input: &str) -> Option<Url> {
 /// Returns `Some(())` = definitely valid, `None` = fall back to full validator.
 #[inline]
 pub(crate) fn try_validate_absolute_fast(raw_input: &str) -> Option<()> {
-    use crate::unicode::{contains_xn_prefix_pub, DOMAIN_CHECK};
+    use crate::unicode::{DOMAIN_CHECK, contains_xn_prefix_pub};
 
     let raw = raw_input.as_bytes();
 

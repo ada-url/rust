@@ -1,5 +1,5 @@
 //! Pure-Rust implementation of the WHATWG URLSearchParams API.
-//! Ref: https://url.spec.whatwg.org/#interface-urlsearchparams
+//! Ref: <https://url.spec.whatwg.org/#interface-urlsearchparams>
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;

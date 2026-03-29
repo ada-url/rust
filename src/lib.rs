@@ -1,3 +1,5 @@
+// Enable std::simd when the nightly-simd feature is active.
+#![cfg_attr(feature = "nightly-simd", feature(portable_simd))]
 //! # Ada URL
 //!
 //! Fast, WHATWG-compliant URL parser written in pure Rust.
@@ -36,10 +38,10 @@ pub(crate) mod idna_impl;
 pub(crate) mod idna_norm_tables;
 pub(crate) mod idna_tables;
 pub(crate) mod parser;
+#[cfg(feature = "nightly-simd")]
+pub(crate) mod portable_simd_impl;
 pub(crate) mod scheme;
 pub(crate) mod serializers;
-#[cfg(feature = "simd")]
-pub(crate) mod simd;
 pub(crate) mod unicode;
 pub(crate) mod url_search_params;
 pub(crate) mod validator;
@@ -1123,7 +1125,7 @@ impl Url {
     /// `input` sets the query to the empty string (not null) — `href` will end
     /// with `?`.  CoW: borrows `input` directly when no encoding is needed.
     pub(crate) fn update_base_search_with_encode(&mut self, input: &str, set: &[u8; 32]) {
-        // CoW: only allocates when encoding is actually required
+        // CoW: borrows when no encoding needed, owns otherwise.
         let enc: Cow<'_, str> = percent_encode(input, set);
         self.write_search_content(&enc);
     }

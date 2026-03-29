@@ -140,8 +140,7 @@ fn validate_absolute_raw(b: &[u8]) -> bool {
                 scheme_lower[scheme_len] = c | 0x20;
                 scheme_len += 1;
             }
-            let scheme_str =
-                unsafe { core::str::from_utf8_unchecked(&scheme_lower[..scheme_len]) };
+            let scheme_str = unsafe { core::str::from_utf8_unchecked(&scheme_lower[..scheme_len]) };
             get_scheme_type(scheme_str)
         } else {
             SchemeType::NotSpecial
@@ -725,9 +724,10 @@ fn validate_ipv6_fast(inner: &[u8]) -> bool {
             if zone.is_empty() {
                 return false;
             }
-            if !zone.iter().all(|&c| {
-                c.is_ascii_alphanumeric() || c == b'.' || c == b'-' || c == b'_'
-            }) {
+            if !zone
+                .iter()
+                .all(|&c| c.is_ascii_alphanumeric() || c == b'.' || c == b'-' || c == b'_')
+            {
                 return false;
             }
             &inner[..idx]
