@@ -231,7 +231,9 @@ pub fn bench_ipv4_decimal(c: &mut Criterion) {
 pub fn bench_ipv4_non_decimal(c: &mut Criterion) {
     // Repeat fixed non-decimal set to 5000 entries, matching GetNonDecimalWorkload
     let src_len = IPV4_NON_DECIMAL_URLS.len();
-    let urls: Vec<&str> = (0..5000).map(|i| IPV4_NON_DECIMAL_URLS[i % src_len]).collect();
+    let urls: Vec<&str> = (0..5000)
+        .map(|i| IPV4_NON_DECIMAL_URLS[i % src_len])
+        .collect();
     run_benchmark_static(c, "Bench_IPv4_NonDecimal", &urls);
 }
 
@@ -243,5 +245,10 @@ pub fn bench_dns(c: &mut Criterion) {
     run_benchmark_static(c, "Bench_DNS", &urls);
 }
 
-criterion_group!(benches, bench_ipv4_decimal, bench_ipv4_non_decimal, bench_dns);
+criterion_group!(
+    benches,
+    bench_ipv4_decimal,
+    bench_ipv4_non_decimal,
+    bench_dns
+);
 criterion_main!(benches);
