@@ -28,10 +28,10 @@ jobs:
           tool: cargo-codspeed
 
       - name: Build benchmark targets
-        run: cargo codspeed build -m walltime
+        run: cargo codspeed build
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4.12.1
         with:
-          mode: walltime
+          mode: simulation
           run: cargo codspeed run
