@@ -22,6 +22,31 @@ name = "parse"
 path = "bench/parse.rs"
 harness = false
 
+[[bench]]
+name = "bbc"
+path = "bench/bbc.rs"
+harness = false
+
+[[bench]]
+name = "search_params"
+path = "bench/search_params.rs"
+harness = false
+
+[[bench]]
+name = "ipv4"
+path = "bench/ipv4.rs"
+harness = false
+
+[[bench]]
+name = "scheme"
+path = "bench/scheme.rs"
+harness = false
+
+[[bench]]
+name = "wpt"
+path = "bench/wpt.rs"
+harness = false
+
 [features]
 default = ["std"]
 # pass `cpp_set_stdlib("c++")` to `cc`
