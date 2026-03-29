@@ -56,7 +56,11 @@ pub fn wpt_bench_ada_url(c: &mut Criterion) {
         let data = load_wpt_data(path);
         if !data.is_empty() {
             url_examples = data;
-            eprintln!("Loaded {} WPT URL entries from {}", url_examples.len(), path_str);
+            eprintln!(
+                "Loaded {} WPT URL entries from {}",
+                url_examples.len(),
+                path_str
+            );
             break;
         }
     }

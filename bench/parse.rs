@@ -1,6 +1,6 @@
+use ada_url::Url;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use std::hint::black_box;
-use ada_url::Url;
 
 /// Realistic URL examples collected on the actual web.
 /// Matches the url_examples_default array in bench.cpp.
@@ -69,5 +69,9 @@ pub fn basic_bench_ada_url_can_parse(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, basic_bench_ada_url_href, basic_bench_ada_url_can_parse);
+criterion_group!(
+    benches,
+    basic_bench_ada_url_href,
+    basic_bench_ada_url_can_parse
+);
 criterion_main!(benches);

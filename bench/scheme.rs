@@ -6,8 +6,8 @@
 /// https://lemire.me/blog/2022/12/30/quickly-checking-that-a-string-belongs-to-a-small-set/
 use ada_url::{SchemeType, Url};
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
-use std::hint::black_box;
 use std::collections::{BTreeMap, HashMap};
+use std::hint::black_box;
 use std::num::Wrapping;
 
 /// Matches the scheme options and weights from bench_protocol.cpp:

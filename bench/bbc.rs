@@ -1,6 +1,6 @@
+use ada_url::Url;
 use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use std::hint::black_box;
-use ada_url::Url;
 
 /// Realistic URL examples collected from the BBC homepage.
 /// Matches url_examples in bbc_bench.cpp.

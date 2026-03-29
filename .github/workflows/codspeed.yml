@@ -20,17 +20,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - name: Setup Rust toolchain, cache and cargo-codspeed
-        uses: moonrepo/setup-rust@v1.3.0
+      - uses: Swatinem/rust-cache@v2.9.1
+
+      - name: Install cargo-codspeed
+        uses: taiki-e/install-action@v2.70.1
         with:
-          channel: stable
-          cache-target: release
-          bins: cargo-codspeed
+          tool: cargo-codspeed
 
       - name: Build benchmark targets
-        run: cargo codspeed build
+        run: cargo codspeed build -m walltime
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v6.0.2
+        uses: CodSpeedHQ/action@v4.12.1
         with:
+          mode: walltime
           run: cargo codspeed run
