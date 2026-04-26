@@ -16,6 +16,7 @@ categories = ["parser-implementations", "web-programming", "encoding", "parsing"
 repository = "https://github.com/ada-url/rust"
 homepage = "https://ada-url.com"
 license = "MIT OR Apache-2.0"
+links = "ada-url"
 
 [[bench]]
 name = "parse"
