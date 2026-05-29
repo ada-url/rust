@@ -65,6 +65,40 @@ jobs:
           RUSTDOCFLAGS: '-D warnings'
         run: cargo hack doc --feature-powerset
 
+  sanitizers:
+    name: AddressSanitizer + LeakSanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # AddressSanitizer (which bundles LeakSanitizer) requires nightly. We use
+      # clang for the bundled C++ so it shares the LLVM sanitizer runtime that
+      # rustc links into the test binaries. Note: `cargo +nightly` is used
+      # explicitly because rust-toolchain.toml pins a stable channel that would
+      # otherwise override the default toolchain in this directory.
+      - name: Install nightly toolchain
+        run: rustup toolchain install nightly --profile minimal
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: sanitizers
+          save-if: ${{ github.ref_name == 'main' }}
+
+      - run: rustup +nightly show
+
+      # `--target` is required so build scripts / proc-macros (host) are not
+      # instrumented. LeakSanitizer is enabled by default under ASan on Linux;
+      # this catches regressions like https://github.com/ada-url/rust/issues/101
+      # where the failed-parse path leaked the allocation from `ada_parse`.
+      - name: Test under AddressSanitizer + LeakSanitizer
+        env:
+          CC: clang
+          CXX: clang++
+          ADA_SANITIZE: address
+          RUSTFLAGS: '-Zsanitizer=address'
+          ASAN_OPTIONS: 'detect_leaks=1'
+        run: cargo +nightly test --tests --target x86_64-unknown-linux-gnu
+
   format:
     name: Format
     runs-on: ubuntu-latest

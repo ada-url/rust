@@ -230,6 +230,11 @@ impl Url {
         if unsafe { ffi::ada_is_valid(url_aggregator) } {
             Ok(url_aggregator.into())
         } else {
+            // `ada_parse`/`ada_parse_with_base` always allocate a result on the
+            // heap, even when parsing fails. On the success path the pointer is
+            // owned by `Url` and freed via its `Drop` impl, but on the error path
+            // we must free it here to avoid leaking the allocation.
+            unsafe { ffi::ada_free(url_aggregator) };
             Err(ParseUrlError { input })
         }
     }
