@@ -194,5 +194,19 @@ fn main() {
         }
     }
 
+    // Optionally compile the bundled C++ (ada) with a sanitizer. This is used
+    // by the AddressSanitizer CI job so that FFI allocations (e.g. the result
+    // `ada_parse` always heap-allocates) are instrumented and leaks/errors
+    // inside ada itself are caught. Enable with `ADA_SANITIZE=address` and a
+    // matching `RUSTFLAGS=-Zsanitizer=address`; use a clang toolchain (CC/CXX)
+    // so the C++ shares the LLVM sanitizer runtime that rustc links in.
+    println!("cargo:rerun-if-env-changed=ADA_SANITIZE");
+    if let Ok(sanitizer) = env::var("ADA_SANITIZE")
+        && !sanitizer.is_empty()
+    {
+        build.flag(format!("-fsanitize={sanitizer}"));
+        build.flag("-fno-omit-frame-pointer");
+    }
+
     build.compile("ada");
 }

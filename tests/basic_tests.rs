@@ -242,6 +242,22 @@ fn confusing_mess() {
     assert_eq!(url.origin(), "http://d:2");
 }
 
+/// Regression test for <https://github.com/ada-url/rust/issues/101>.
+///
+/// `ada_parse`/`ada_parse_with_base` always allocate a result on the heap,
+/// even when the input fails to parse. The failed-parse path used to drop the
+/// returned pointer without calling `ada_free`, leaking one allocation per
+/// call. This test repeatedly parses invalid input on both the base-less and
+/// with-base code paths; under LeakSanitizer/Valgrind a regression here shows
+/// up as leaked allocations originating in `ada_parse`.
+#[test]
+fn parse_invalid_url_does_not_leak() {
+    for _ in 0..1_000 {
+        assert!(Url::parse("http://[invalid", None).is_err());
+        assert!(Url::parse("http://[invalid", Some("http://example.com")).is_err());
+    }
+}
+
 #[test]
 fn standard_file() {
     let url = parse("file:///tmp/mock/path");
