@@ -88,24 +88,28 @@ fn ndk_major_version(ndk_dir: &Path) -> u32 {
 }
 
 fn main() {
-    // Allow downstream builds to skip compiling the bundled C++ `ada` sources
-    // and instead link against an externally provided ada library. This is
-    // useful when ada is already provided by the host build system (e.g. Bazel,
-    // CMake, or a distro package), where compiling the bundled copy would
-    // otherwise produce a second, duplicate copy of ada in the final binary.
+    // By default the bundled C++ `ada` sources are compiled and linked
+    // statically (the `bundled` feature, enabled by default). Disabling the
+    // `bundled` feature (e.g. `default-features = false`) skips that compile and
+    // instead links against an externally provided ada library. This is useful
+    // when ada is already provided by the host build system (e.g. Bazel, CMake,
+    // or a distro package), where compiling the bundled copy would otherwise
+    // produce a second, duplicate copy of ada in the final binary.
     //
-    //   ADA_USE_SYSTEM_LIB  if set (non-empty), do not build the bundled ada.
-    //   ADA_LIB_DIR         optional directory added to the link search path.
-    //   ADA_LIB_NAME        optional library to link, passed verbatim to
-    //                       `cargo:rustc-link-lib` (e.g. `ada` or `static=ada`).
+    // When the `bundled` feature is disabled, these optional environment
+    // variables configure how the external ada is linked:
     //
-    // When `ADA_USE_SYSTEM_LIB` is set but neither `ADA_LIB_NAME` nor
-    // `ADA_LIB_DIR` is provided, no link directive is emitted, leaving it to the
-    // host build system to provide the ada symbols at final link time.
-    println!("cargo:rerun-if-env-changed=ADA_USE_SYSTEM_LIB");
+    //   ADA_LIB_DIR   directory added to the link search path.
+    //   ADA_LIB_NAME  library to link, passed verbatim to `cargo:rustc-link-lib`
+    //                 (e.g. `ada` or `static=ada`).
+    //
+    // If neither is provided, no link directive is emitted, leaving it to the
+    // host build system to provide the ada symbols at final link time. The
+    // external ada must expose the same C ABI (`ada_*`) and be ABI-compatible
+    // with this crate's version.
     println!("cargo:rerun-if-env-changed=ADA_LIB_DIR");
     println!("cargo:rerun-if-env-changed=ADA_LIB_NAME");
-    if env::var_os("ADA_USE_SYSTEM_LIB").is_some_and(|v| !v.is_empty()) {
+    if !cfg!(feature = "bundled") {
         if let Some(dir) = env::var_os("ADA_LIB_DIR") {
             println!(
                 "cargo:rustc-link-search=native={}",
