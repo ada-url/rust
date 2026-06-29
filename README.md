@@ -23,6 +23,31 @@ Enabling this feature and `std` would provide you both `Serialize` and `Deserial
 **libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default.
 Enabling this feature without `libc++` installed would cause compile error.
 
+### Linking against an external ada
+
+By default the build script compiles the bundled C++ `ada` sources and links
+them statically. If ada is already provided by your host build system (e.g.
+Bazel, CMake, or a distribution package), compiling the bundled copy would
+produce a second, duplicate copy of ada in the final binary. The following
+build-time environment variables let you skip the bundled build and link
+against an external ada instead:
+
+| Variable             | Description                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ADA_USE_SYSTEM_LIB` | If set (non-empty), do not compile the bundled `deps/ada.cpp`.                                                 |
+| `ADA_LIB_DIR`        | Optional directory added to the linker search path (`cargo:rustc-link-search=native`).                        |
+| `ADA_LIB_NAME`       | Optional library to link, passed verbatim to `cargo:rustc-link-lib` (e.g. `ada` or `static=ada`).             |
+
+When `ADA_USE_SYSTEM_LIB` is set but neither `ADA_LIB_NAME` nor `ADA_LIB_DIR`
+is provided, no link directive is emitted, leaving it to the host build system
+to provide the ada symbols at final link time. The external ada must expose the
+same C ABI (`ada_*`) and be ABI-compatible with this crate's version.
+
+```sh
+# Link against a system-installed libada in /usr/local/lib
+ADA_USE_SYSTEM_LIB=1 ADA_LIB_DIR=/usr/local/lib ADA_LIB_NAME=ada cargo build
+```
+
 ### Performance
 
 Ada is fast. The benchmark below shows **3.49 times** faster URL parsing compared to `url`
