@@ -58,12 +58,53 @@ jobs:
         run: cargo hack clippy --feature-powerset -- -D warnings
 
       - name: Test
-        run: cargo hack test --feature-powerset
+        # `bundled` must stay enabled for every combination: it is what compiles
+        # and statically links the C++ ada sources. Without it (and with no
+        # external ada provided via ADA_LIB_DIR/ADA_LIB_NAME) the test binaries
+        # fail to link with `undefined symbol: ada_*`. `--features bundled` forces
+        # it into each powerset entry while still exercising the other features.
+        run: cargo hack test --feature-powerset --features bundled
 
       - name: Check Documentation
         env:
           RUSTDOCFLAGS: '-D warnings'
         run: cargo hack doc --feature-powerset
+
+  external-ada:
+    name: External ada (non-bundled)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: external-ada
+          save-if: ${{ github.ref_name == 'main' }}
+
+      - run: rustup show
+
+      # Exercise the non-bundled linking path: instead of compiling the bundled
+      # C++ sources, build ada once as a standalone shared library and link the
+      # crate against it via ADA_LIB_DIR / ADA_LIB_NAME. This mirrors how a host
+      # build system (Bazel, CMake, a distro package) would provide ada. The
+      # shared library records its own libstdc++ dependency (DT_NEEDED), so the
+      # final Rust binary needs no extra C++ runtime link flags.
+      - name: Build standalone libada.so
+        run: |
+          c++ -std=c++20 -O2 -DADA_INCLUDE_URL_PATTERN=0 -Ideps -fPIC -shared \
+            deps/ada.cpp -o "$RUNNER_TEMP/libada.so"
+
+      # `bundled` is intentionally disabled (default-features off). `std` is
+      # re-enabled because dropping default features also drops it. The serde
+      # combination is run separately to cover the extra feature on this path.
+      - name: Test against external ada
+        env:
+          ADA_LIB_DIR: ${{ runner.temp }}
+          ADA_LIB_NAME: ada
+          LD_LIBRARY_PATH: ${{ runner.temp }}
+        run: |
+          cargo test --no-default-features --features std
+          cargo test --no-default-features --features serde
 
   sanitizers:
     name: AddressSanitizer + LeakSanitizer
