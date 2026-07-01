@@ -49,7 +49,11 @@ path = "bench/wpt.rs"
 harness = false
 
 [features]
-default = ["std"]
+default = ["bundled", "std"]
+# compile and statically link the bundled C++ `ada` sources. Enabled by
+# default; disable (`default-features = false`) to link an externally provided
+# ada instead (see `ADA_LIB_DIR` / `ADA_LIB_NAME` in build.rs).
+bundled = []
 # pass `cpp_set_stdlib("c++")` to `cc`
 libcpp = []
 # enables serde serialization/deserialization support

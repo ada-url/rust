@@ -23,6 +23,44 @@ Enabling this feature and `std` would provide you both `Serialize` and `Deserial
 **libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default.
 Enabling this feature without `libc++` installed would cause compile error.
 
+**bundled:** Compile and statically link the bundled C++ `ada` sources. This
+feature is **enabled by default**. See "Linking against an external ada" below
+for how to disable it.
+
+### Linking against an external ada
+
+By default (the `bundled` feature) the build script compiles the bundled C++
+`ada` sources and links them statically. If ada is already provided by your
+host build system (e.g. Bazel, CMake, or a distribution package), compiling the
+bundled copy would produce a second, duplicate copy of ada in the final binary.
+
+Disable the `bundled` feature to skip the bundled build and link against an
+external ada instead:
+
+```toml
+# Cargo.toml — re-enable `std` since disabling default features also drops it
+ada-url = { version = "3", default-features = false, features = ["std"] }
+```
+
+When `bundled` is disabled, these optional environment variables configure how
+the external ada is linked:
+
+| Variable      | Description                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| `ADA_LIB_DIR` | Optional directory added to the linker search path (`cargo:rustc-link-search=native`).             |
+| `ADA_LIB_NAME`| Optional library to link, passed verbatim to `cargo:rustc-link-lib` (e.g. `ada` or `static=ada`).  |
+
+If neither is provided, no link directive is emitted, leaving it to the host
+build system to provide the ada symbols at final link time. The external ada
+must expose the same C ABI (`ada_*`) and be ABI-compatible with this crate's
+version.
+
+```sh
+# Link against a system-installed libada in /usr/local/lib
+ADA_LIB_DIR=/usr/local/lib ADA_LIB_NAME=ada \
+  cargo build --no-default-features --features std
+```
+
 ### Performance
 
 Ada is fast. The benchmark below shows **3.49 times** faster URL parsing compared to `url`
