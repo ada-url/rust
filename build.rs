@@ -157,9 +157,17 @@ fn main() {
                     }
                     _ => "wasm32-wasip1",
                 };
-                println!(
-                    "cargo:rustc-link-search={wasi_sdk}/share/wasi-sysroot/lib/{wasi_sysroot_lib}"
-                );
+                let sysroot_lib = format!("{wasi_sdk}/share/wasi-sysroot/lib/{wasi_sysroot_lib}");
+                // libc and its startup objects (crt1) live directly in this directory.
+                println!("cargo:rustc-link-search={sysroot_lib}");
+                // wasi-sdk 27+ split libc++/libc++abi into `eh/` (exceptions) and
+                // `noeh/` (no exceptions) subdirectories. We build with
+                // `-fno-exceptions`, so add the `noeh` variant to the search path
+                // when it exists; older wasi-sdk keeps these libs flat in `sysroot_lib`.
+                let noeh_lib = format!("{sysroot_lib}/noeh");
+                if Path::new(&noeh_lib).exists() {
+                    println!("cargo:rustc-link-search={noeh_lib}");
+                }
                 // Wasm exceptions are new and not yet supported by WASI SDK.
                 build.flag("-fno-exceptions");
                 // WASI SDK only has libc++ available.
