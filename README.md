@@ -39,7 +39,7 @@ external ada instead:
 
 ```toml
 # Cargo.toml — re-enable `std` since disabling default features also drops it
-ada-url = { version = "3", default-features = false, features = ["std"] }
+ada-url = { version = "4", default-features = false, features = ["std"] }
 ```
 
 When `bundled` is disabled, these optional environment variables configure how

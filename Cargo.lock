@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "ada-url"
-version = "3.4.6"
+version = "4.0.0"
 dependencies = [
  "cc",
  "codspeed-criterion-compat",
