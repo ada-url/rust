@@ -362,9 +362,14 @@ fn node_issue_47889() {
     assert_eq!(expected_url.href(), "a:b#");
     assert_eq!(expected_url.pathname(), "b");
 
-    let url = parse_with_base("..#", urlbase.href());
-    assert_eq!(url.href(), "a:b/#");
-    assert_eq!(url.pathname(), "b/");
+    // Opaque-path base: relative inputs that do not begin with '#' fail in the
+    // no-scheme state (Ada 4 / WHATWG). Fragment-only input is accepted.
+    assert!(Url::parse("..#", Some(urlbase.href())).is_err());
+    assert!(Url::parse("x#f", Some(urlbase.href())).is_err());
+
+    let url = parse_with_base("#f", urlbase.href());
+    assert_eq!(url.href(), "a:b#f");
+    assert_eq!(url.pathname(), "b");
 }
 
 #[test]
@@ -502,31 +507,36 @@ fn test_workerd_issue_5144_3() {
 }
 
 #[test]
-#[ignore = "current embedded ada snapshot aborts on validate() assertion for this case"]
 fn issue_1076_set_pathname_dashdot_with_query() {
-    // Intentionally left as a placeholder because executing this scenario
-    // triggers a hard assertion in the embedded ada snapshot.
+    let mut url = parse("foo:/?q");
+    assert!(url.set_pathname(Some("//bar")).is_ok());
+    assert_eq!(url.pathname(), "//bar");
+    assert_eq!(url.search(), "?q");
 }
 
 #[test]
-#[ignore = "current embedded ada snapshot aborts on validate() assertion for this case"]
 fn issue_1076_set_pathname_dashdot_with_hash() {
-    // Intentionally left as a placeholder because executing this scenario
-    // triggers a hard assertion in the embedded ada snapshot.
+    let mut url = parse("foo:/#h");
+    assert!(url.set_pathname(Some("//bar")).is_ok());
+    assert_eq!(url.pathname(), "//bar");
+    assert_eq!(url.hash(), "#h");
 }
 
 #[test]
-#[ignore = "current embedded ada snapshot aborts on validate() assertion for this case"]
 fn issue_1076_set_pathname_dashdot_with_query_and_hash() {
-    // Intentionally left as a placeholder because executing this scenario
-    // triggers a hard assertion in the embedded ada snapshot.
+    let mut url = parse("foo:/?q#h");
+    assert!(url.set_pathname(Some("//bar")).is_ok());
+    assert_eq!(url.pathname(), "//bar");
+    assert_eq!(url.search(), "?q");
+    assert_eq!(url.hash(), "#h");
 }
 
 #[test]
-#[ignore = "current embedded ada snapshot aborts on validate() assertion for this case"]
 fn issue_1076_blob_with_query() {
-    // Intentionally left as a placeholder because executing this scenario
-    // triggers a hard assertion in the embedded ada snapshot.
+    let mut url = parse("blob:/?q");
+    assert!(url.set_pathname(Some("//p")).is_ok());
+    assert_eq!(url.pathname(), "//p");
+    assert_eq!(url.search(), "?q");
 }
 
 #[test]
