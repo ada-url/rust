@@ -179,6 +179,30 @@ fn urltestdata() {
 }
 
 #[test]
+fn can_parse_matches_parse() {
+    for source in URL_SOURCES {
+        let document = read_json(source);
+        let entries = document
+            .as_array()
+            .unwrap_or_else(|| panic!("{source} root is not an array"));
+
+        for (index, entry) in entries.iter().enumerate() {
+            if entry.is_string() {
+                continue;
+            }
+            let case = object(entry, "URL test entry");
+            let input = string(case, "input");
+            let base = optional_string(case, "base");
+            assert_eq!(
+                Url::can_parse(input, base),
+                Url::parse_with_base(input, base).is_ok(),
+                "{source}:{index}: input={input:?}, base={base:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn setters() {
     for source in SETTER_SOURCES {
         let document = read_json(source);

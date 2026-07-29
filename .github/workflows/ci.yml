@@ -1,45 +1,130 @@
 name: CI
 
 on:
-  push:
+  workflow_dispatch:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
 
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'main' }}
+
 jobs:
   test:
+    name: Check & Test
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: windows-latest
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: ubuntu-latest
+            env:
+              CARGO_BUILD_TARGET: wasm32-wasip1
+              CARGO_TARGET_WASM32_WASI_RUNNER: /home/runner/.wasmtime/bin/wasmtime --dir=.
     runs-on: ${{ matrix.os }}
+    env: ${{ matrix.env || fromJSON('{}') }}
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo test --all-features --locked
 
-  quality:
+      - name: Install Wasm runtime
+        if: matrix.env.CARGO_BUILD_TARGET == 'wasm32-wasip1'
+        run: |
+          rustup target add wasm32-wasip1
+          curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v46.0.1/wasmtime-v46.0.1-x86_64-linux.tar.xz
+          tar xvf wasmtime-v46.0.1-x86_64-linux.tar.xz
+          echo "$PWD/wasmtime-v46.0.1-x86_64-linux" >> "$GITHUB_PATH"
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci
+          save-if: ${{ github.ref_name == 'main' }}
+
+      - run: rustup show
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Clippy
+        run: cargo hack clippy --feature-powerset --locked -- -D warnings
+
+      - name: Test
+        run: cargo hack test --feature-powerset --locked
+
+      - name: Check Documentation
+        env:
+          RUSTDOCFLAGS: '-D warnings'
+        run: cargo hack doc --feature-powerset --locked
+
+  sanitizers:
+    name: AddressSanitizer + LeakSanitizer
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+
+      - name: Install nightly toolchain
+        run: rustup toolchain install nightly --profile minimal
+
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: sanitizers
+          save-if: ${{ github.ref_name == 'main' }}
+
+      - run: rustup +nightly show
+
+      - name: Test under AddressSanitizer + LeakSanitizer
+        env:
+          RUSTFLAGS: '-Zsanitizer=address'
+          ASAN_OPTIONS: 'detect_leaks=1'
+        run: cargo +nightly test --tests --target x86_64-unknown-linux-gnu
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: rustup show
+
       - run: cargo fmt --all -- --check
-      - run: cargo check --no-default-features --locked
+
+  lint:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci
+          save-if: false
+
+      - run: rustup show
+
       - run: cargo clippy --all-targets --all-features --locked -- -D warnings
-      - run: RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps --locked
 
   miri:
+    name: Miri
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: miri
+
       - uses: Swatinem/rust-cache@v2
-      - run: cargo miri setup
-      - run: cargo miri test --lib --no-default-features
+
+      # rust-toolchain.toml pins stable, so select nightly explicitly.
+      - run: cargo +nightly miri setup
+      - run: cargo +nightly miri test --lib --no-default-features

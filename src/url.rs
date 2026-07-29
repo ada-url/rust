@@ -1,7 +1,7 @@
 //! Single-buffer URL representation and public operations.
 
 use alloc::{
-    borrow::{Cow, ToOwned},
+    borrow::Cow,
     boxed::Box,
     format,
     string::{String, ToString},
@@ -80,10 +80,27 @@ impl Url {
     pub fn parse_with_url_base(input: &str, base: Option<&Self>) -> Result<Self, ParseError> {
         check_raw_length(input)?;
 
+        if base.is_none()
+            && input.len() <= 32
+            && let Some(parsed) = fast_path::parse_bare_special(input)
+        {
+            return Self::from_fast_path(parsed);
+        }
+        if base.is_none() && might_be_explicit_file(input) {
+            if let Some(parsed) = fast_path::parse_normalized_file(input) {
+                return Self::from_fast_path(parsed);
+            }
+            if let Some(parsed) = parse_explicit_file(input, None) {
+                return parsed;
+            }
+        }
         if let Some(parsed) = fast_path::parse(input) {
             return Self::from_fast_path(parsed);
         }
-        if let Some(parsed) = fast_path::parse_normalized_file(input) {
+        let opaque_candidate = memchr(b':', input.as_bytes())
+            .and_then(|colon| input.as_bytes().get(colon + 1))
+            .is_some_and(|byte| *byte != b'/');
+        if opaque_candidate && let Some(parsed) = fast_path::parse_opaque_absolute(input) {
             return Self::from_fast_path(parsed);
         }
         match fast_path::parse_common_absolute(input) {
@@ -93,17 +110,6 @@ impl Url {
             }
             fast_path::CommonParse::Unsupported => {}
         }
-        if let Some(parsed) = fast_path::parse_opaque_absolute(input) {
-            return Self::from_fast_path(parsed);
-        }
-
-        if base.is_none()
-            && might_be_explicit_file(input)
-            && let Some(parsed) = parse_explicit_file(input, None)
-        {
-            return parsed;
-        }
-
         let parsed = if let Some(base) = base {
             if might_be_explicit_file(input)
                 && let Some(parsed) = parse_explicit_file(input, Some(base))
@@ -211,13 +217,20 @@ impl Url {
     /// Returns whether `input` is parseable, optionally against a string base.
     #[must_use]
     pub fn can_parse(input: &str, base: Option<&str>) -> bool {
-        if input.len() > get_max_input_length() as usize {
+        let max_input_length = get_max_input_length();
+        if input.len() > max_input_length as usize {
             return false;
+        }
+        if max_input_length == u32::MAX
+            && base.is_none()
+            && let Some(valid) = fast_path::can_parse_special_absolute(input)
+        {
+            return valid;
         }
         if base.is_none()
             && let Some(normalized_len) = fast_path::normalized_len(input)
         {
-            return normalized_len <= get_max_input_length() as usize;
+            return normalized_len <= max_input_length as usize;
         }
 
         Self::parse_with_base(input, base).is_ok()
@@ -1603,18 +1616,11 @@ fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, 
     Some((|| {
         let (path, query, fragment) = split_path_query_fragment(input);
         let rooted = path.starts_with('/') || (base.is_special() && path.starts_with('\\'));
-        let mut segments = if rooted {
-            Vec::new()
+        let mut resolved_path = if rooted {
+            String::from("/")
         } else {
-            let mut segments = base
-                .pathname()
-                .strip_prefix('/')
-                .unwrap_or(base.pathname())
-                .split('/')
-                .map(str::to_owned)
-                .collect::<Vec<_>>();
-            segments.pop();
-            segments
+            let parent_end = base.pathname().rfind('/').map_or(0, |index| index + 1);
+            String::from(&base.pathname()[..parent_end])
         };
         let path = if rooted { &path[1..] } else { path };
         let mut input_segments = path
@@ -1624,31 +1630,34 @@ fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, 
                 &['/'][..]
             })
             .peekable();
+        let mut needs_separator = false;
         while let Some(segment) = input_segments.next() {
             if is_single_dot_segment(segment) {
-                if input_segments.peek().is_none() {
-                    segments.push(String::new());
+                if input_segments.peek().is_none() && !resolved_path.ends_with('/') {
+                    resolved_path.push('/');
                 }
                 continue;
             }
             if is_double_dot_segment(segment) {
-                segments.pop();
-                if input_segments.peek().is_none() {
-                    segments.push(String::new());
+                shorten_resolved_path(&mut resolved_path);
+                needs_separator = false;
+                if input_segments.peek().is_none() && !resolved_path.ends_with('/') {
+                    resolved_path.push('/');
                 }
                 continue;
             }
-            segments.push(utf8_percent_encode(segment, PATH_ENCODE_SET).to_string());
+            if needs_separator || !resolved_path.ends_with('/') {
+                resolved_path.push('/');
+            }
+            resolved_path.extend(utf8_percent_encode(segment, PATH_ENCODE_SET));
+            needs_separator = true;
         }
 
-        let mut buffer = base.buffer[..base.components.pathname_start as usize].to_owned();
-        buffer.push('/');
-        for (index, segment) in segments.iter().enumerate() {
-            if index != 0 {
-                buffer.push('/');
-            }
-            buffer.push_str(segment);
-        }
+        let pathname_start = base.components.pathname_start as usize;
+        let mut buffer =
+            String::with_capacity(pathname_start + resolved_path.len() + input.len() + 8);
+        buffer.push_str(&base.buffer[..pathname_start]);
+        buffer.push_str(&resolved_path);
         let search_start = query
             .map(|query| {
                 let start = to_u32(buffer.len())?;
@@ -1689,6 +1698,18 @@ fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, 
             flags: base.flags,
         })
     })())
+}
+
+fn shorten_resolved_path(path: &mut String) {
+    if path == "/" {
+        return;
+    }
+    let end = path.len().saturating_sub(usize::from(path.ends_with('/')));
+    let parent_end = path.as_bytes()[..end]
+        .iter()
+        .rposition(|byte| *byte == b'/')
+        .map_or(0, |index| index + 1);
+    path.truncate(parent_end.max(1));
 }
 
 fn parse_explicit_file(input: &str, base: Option<&Url>) -> Option<Result<Url, ParseError>> {
@@ -1891,42 +1912,68 @@ fn has_url_scheme(input: &str) -> bool {
 
 fn parse_file_suffix(input: &str, mut segments: Vec<String>) -> String {
     let (path, query, fragment) = split_path_query_fragment(input);
+    let mut suffix = String::with_capacity(
+        segments
+            .iter()
+            .map(|segment| segment.len() + 1)
+            .sum::<usize>()
+            + input.len()
+            + 1,
+    );
+    for segment in segments.drain(..) {
+        suffix.push('/');
+        suffix.push_str(&segment);
+    }
     let mut input_segments = path.split(['/', '\\']).peekable();
     while let Some(segment) = input_segments.next() {
         if is_single_dot_segment(segment) {
-            if input_segments.peek().is_none() {
-                segments.push(String::new());
+            if input_segments.peek().is_none() && !suffix.ends_with('/') {
+                suffix.push('/');
             }
             continue;
         }
         if is_double_dot_segment(segment) {
-            shorten_file_path(&mut segments);
-            if input_segments.peek().is_none() {
-                segments.push(String::new());
+            shorten_file_suffix(&mut suffix);
+            if input_segments.peek().is_none() && !suffix.ends_with('/') {
+                suffix.push('/');
             }
             continue;
         }
 
-        let normalized = if segments.is_empty() && is_windows_drive_letter(segment.as_bytes()) {
-            let mut drive = String::from(segment);
-            drive.replace_range(1..2, ":");
-            drive
-        } else {
-            utf8_percent_encode(segment, PATH_ENCODE_SET).to_string()
-        };
-        segments.push(normalized);
-    }
-
-    let mut suffix = String::new();
-    for segment in segments {
         suffix.push('/');
-        suffix.push_str(&segment);
+        if suffix.len() == 1 && is_windows_drive_letter(segment.as_bytes()) {
+            suffix.push(char::from(segment.as_bytes()[0]));
+            suffix.push(':');
+        } else {
+            suffix.extend(utf8_percent_encode(segment, PATH_ENCODE_SET));
+        }
     }
     if suffix.is_empty() {
         suffix.push('/');
     }
     append_query_and_fragment(&mut suffix, query, fragment);
     suffix
+}
+
+fn shorten_file_suffix(suffix: &mut String) {
+    if suffix.is_empty() || suffix == "/" {
+        return;
+    }
+    let end = suffix
+        .len()
+        .saturating_sub(usize::from(suffix.ends_with('/')));
+    if end == 3
+        && suffix.as_bytes()[0] == b'/'
+        && suffix.as_bytes()[1].is_ascii_alphabetic()
+        && suffix.as_bytes()[2] == b':'
+    {
+        return;
+    }
+    let parent_end = suffix.as_bytes()[..end]
+        .iter()
+        .rposition(|byte| *byte == b'/')
+        .unwrap_or(0);
+    suffix.truncate(parent_end);
 }
 
 fn parse_non_special_path(input: &str) -> String {
@@ -1978,11 +2025,11 @@ fn suffix_with_preserved_file_path(input: &str, base: &Url) -> String {
         }
     } else if let Some(query) = query {
         suffix.push('?');
-        suffix.push_str(&utf8_percent_encode(query, SPECIAL_QUERY_ENCODE_SET).to_string());
+        suffix.extend(utf8_percent_encode(query, SPECIAL_QUERY_ENCODE_SET));
     }
     if let Some(fragment) = fragment {
         suffix.push('#');
-        suffix.push_str(&utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET).to_string());
+        suffix.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
     }
     suffix
 }
@@ -1990,11 +2037,11 @@ fn suffix_with_preserved_file_path(input: &str, base: &Url) -> String {
 fn append_query_and_fragment(suffix: &mut String, query: Option<&str>, fragment: Option<&str>) {
     if let Some(query) = query {
         suffix.push('?');
-        suffix.push_str(&utf8_percent_encode(query, SPECIAL_QUERY_ENCODE_SET).to_string());
+        suffix.extend(utf8_percent_encode(query, SPECIAL_QUERY_ENCODE_SET));
     }
     if let Some(fragment) = fragment {
         suffix.push('#');
-        suffix.push_str(&utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET).to_string());
+        suffix.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
     }
 }
 
@@ -2282,6 +2329,7 @@ mod tests {
         set_max_input_length(19);
         let error = Url::parse_with_url_base("https://example.com", None).unwrap_err();
         assert_eq!(error.kind(), ParseErrorKind::TooLong);
+        assert!(!Url::can_parse("https://example.com", None));
         set_max_input_length(old);
     }
 }

@@ -1,10 +1,14 @@
 //! Conservative fast path for already-normalized HTTP(S) URLs.
 
 use alloc::{
+    borrow::Cow,
     format,
     string::{String, ToString},
 };
-use core::net::{Ipv4Addr, Ipv6Addr};
+use core::{
+    fmt::{self, Write},
+    net::{Ipv4Addr, Ipv6Addr},
+};
 use memchr::{memchr, memchr2, memchr3};
 use percent_encoding::{AsciiSet, CONTROLS, percent_decode_str, utf8_percent_encode};
 
@@ -18,6 +22,285 @@ pub(crate) struct FastPath {
     pub host_type: HostType,
     pub has_authority: bool,
     pub opaque_path: bool,
+}
+
+/// Parse the overwhelmingly common `http(s)://host` shape without running the
+/// general scanner. This path is particularly important for IPv4 workloads:
+/// the general DNS scanner deliberately rejects numeric final labels, which
+/// otherwise makes an IPv4 URL traverse the input twice.
+#[inline]
+pub(crate) fn parse_bare_special(input: &str) -> Option<FastPath> {
+    let (protocol_end, host_start, scheme_type) = special_prefix(input.as_bytes())?;
+    let tail = input.as_bytes().get(host_start..)?;
+    let (raw_host, has_path_slash) = tail
+        .strip_suffix(b"/")
+        .map_or((tail, false), |host| (host, true));
+    if raw_host.is_empty() || raw_host.len() > 253 {
+        return None;
+    }
+    if scheme_type == SchemeType::File && raw_host.eq_ignore_ascii_case(b"localhost") {
+        return None;
+    }
+
+    if is_simple_domain(raw_host) && !ends_in_number(raw_host) {
+        return finish_bare_copied_host(
+            input,
+            protocol_end,
+            host_start,
+            has_path_slash,
+            scheme_type,
+            HostType::Domain,
+        );
+    }
+
+    if let Some(address) = raw_host
+        .strip_prefix(b"[")
+        .and_then(|host| host.strip_suffix(b"]"))
+        .and_then(|host| core::str::from_utf8(host).ok())
+        .and_then(|host| host.parse::<Ipv6Addr>().ok())
+    {
+        let mut canonical = Ipv6Buffer::default();
+        write!(&mut canonical, "{address}").ok()?;
+        if canonical.as_bytes() == &raw_host[1..raw_host.len() - 1] {
+            return finish_bare_copied_host(
+                input,
+                protocol_end,
+                host_start,
+                has_path_slash,
+                scheme_type,
+                HostType::IPV6,
+            );
+        }
+    }
+
+    let address = parse_ipv4_bytes(raw_host)?;
+    let mut buffer = String::with_capacity(host_start + 16);
+    buffer.push_str(&input[..host_start]);
+    push_ipv4(&mut buffer, address);
+    let host_end = buffer.len();
+    buffer.push('/');
+    let components = Components::new(
+        u32::try_from(protocol_end).ok()?,
+        u32::try_from(host_start).ok()?,
+        u32::try_from(host_start).ok()?,
+        u32::try_from(host_end).ok()?,
+        None,
+        u32::try_from(host_end).ok()?,
+        None,
+        None,
+    );
+    debug_assert!(components.validate(buffer.len()));
+    Some(FastPath {
+        buffer,
+        components,
+        scheme_type,
+        host_type: HostType::IPV4,
+        has_authority: true,
+        opaque_path: false,
+    })
+}
+
+fn finish_bare_copied_host(
+    input: &str,
+    protocol_end: usize,
+    host_start: usize,
+    has_path_slash: bool,
+    scheme_type: SchemeType,
+    host_type: HostType,
+) -> Option<FastPath> {
+    let mut buffer = String::with_capacity(input.len() + usize::from(!has_path_slash));
+    buffer.push_str(input);
+    if !has_path_slash {
+        buffer.push('/');
+    }
+    let host_end = input.len() - usize::from(has_path_slash);
+    let components = Components::new(
+        u32::try_from(protocol_end).ok()?,
+        u32::try_from(host_start).ok()?,
+        u32::try_from(host_start).ok()?,
+        u32::try_from(host_end).ok()?,
+        None,
+        u32::try_from(host_end).ok()?,
+        None,
+        None,
+    );
+    debug_assert!(components.validate(buffer.len()));
+    Some(FastPath {
+        buffer,
+        components,
+        scheme_type,
+        host_type,
+        has_authority: true,
+        opaque_path: false,
+    })
+}
+
+struct Ipv6Buffer {
+    bytes: [u8; 39],
+    length: usize,
+}
+
+impl Default for Ipv6Buffer {
+    fn default() -> Self {
+        Self {
+            bytes: [0; 39],
+            length: 0,
+        }
+    }
+}
+
+impl Ipv6Buffer {
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..self.length]
+    }
+}
+
+impl Write for Ipv6Buffer {
+    fn write_str(&mut self, input: &str) -> fmt::Result {
+        let end = self.length.checked_add(input.len()).ok_or(fmt::Error)?;
+        let destination = self.bytes.get_mut(self.length..end).ok_or(fmt::Error)?;
+        destination.copy_from_slice(input.as_bytes());
+        self.length = end;
+        Ok(())
+    }
+}
+
+/// Validate a common absolute URL without allocating or producing
+/// component offsets. `None` means the input needs the full WHATWG parser.
+#[inline]
+pub(crate) fn can_parse_special_absolute(input: &str) -> Option<bool> {
+    let bytes = input.as_bytes();
+    let (host_start, special) = if let Some((_, host_start, scheme_type)) = special_prefix(bytes) {
+        if scheme_type == SchemeType::File {
+            return None;
+        }
+        (host_start, true)
+    } else {
+        let colon = memchr(b':', bytes)?;
+        let scheme = &bytes[..colon];
+        if scheme.is_empty()
+            || !scheme[0].is_ascii_alphabetic()
+            || !scheme[1..]
+                .iter()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
+            || !bytes.get(colon + 1..)?.starts_with(b"//")
+        {
+            return None;
+        }
+        (colon + 3, false)
+    };
+    let authority_tail = bytes.get(host_start..)?;
+    let authority_len = memchr3(b'/', b'?', b'#', authority_tail).unwrap_or(authority_tail.len());
+    let authority = &authority_tail[..authority_len];
+    if authority.is_empty() {
+        return Some(!special);
+    }
+
+    if special && memchr(b'\\', authority_tail).is_some_and(|index| index < authority_len) {
+        return None;
+    }
+
+    let host_port = authority
+        .iter()
+        .rposition(|byte| *byte == b'@')
+        .map_or(authority, |index| &authority[index + 1..]);
+    if host_port.is_empty() {
+        return Some(false);
+    }
+    if host_port.starts_with(b"[") {
+        let closing = host_port.iter().position(|byte| *byte == b']')?;
+        let address = core::str::from_utf8(&host_port[1..closing]).ok()?;
+        if address.parse::<Ipv6Addr>().is_err() {
+            return Some(false);
+        }
+        let after = &host_port[closing + 1..];
+        if after.is_empty() {
+            return Some(true);
+        }
+        let port = after.strip_prefix(b":")?;
+        return Some(port.is_empty() || parse_port(port).is_some());
+    }
+
+    let (host, port) = host_port
+        .iter()
+        .rposition(|byte| *byte == b':')
+        .map_or((host_port, None), |index| {
+            (&host_port[..index], Some(&host_port[index + 1..]))
+        });
+    if host.is_empty() {
+        return Some(!special && port.is_none());
+    }
+    if host.len() > 253 {
+        return Some(false);
+    }
+    if let Some(port) = port {
+        if port.is_empty() {
+            // An empty port is accepted and stripped by the URL parser.
+        } else if parse_port(port).is_none() {
+            return Some(false);
+        }
+    }
+    if !special {
+        if host.iter().copied().any(is_forbidden_opaque_host_byte) {
+            return Some(false);
+        }
+        return Some(true);
+    }
+    if ends_in_number(host) {
+        return Some(parse_ipv4_bytes(host).is_some());
+    }
+    if !is_simple_domain_case_insensitive(host) {
+        return None;
+    }
+    Some(true)
+}
+
+#[inline]
+fn special_prefix(input: &[u8]) -> Option<(usize, usize, SchemeType)> {
+    if input.starts_with(b"http://") {
+        Some((5, 7, SchemeType::Http))
+    } else if input.starts_with(b"https://") {
+        Some((6, 8, SchemeType::Https))
+    } else if input.starts_with(b"ws://") {
+        Some((3, 5, SchemeType::Ws))
+    } else if input.starts_with(b"wss://") {
+        Some((4, 6, SchemeType::Wss))
+    } else if input.starts_with(b"ftp://") {
+        Some((4, 6, SchemeType::Ftp))
+    } else if input.starts_with(b"file://") {
+        Some((5, 7, SchemeType::File))
+    } else {
+        None
+    }
+}
+
+#[inline]
+fn is_simple_domain(host: &[u8]) -> bool {
+    host.iter().all(|byte| {
+        byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'-' | b'_')
+    })
+}
+
+#[inline]
+fn is_simple_domain_case_insensitive(host: &[u8]) -> bool {
+    host.iter()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'))
+}
+
+#[inline]
+fn parse_port(input: &[u8]) -> Option<u16> {
+    let mut value = 0_u32;
+    for &byte in input {
+        let digit = byte.checked_sub(b'0')?;
+        if digit > 9 {
+            return None;
+        }
+        value = value.checked_mul(10)?.checked_add(u32::from(digit))?;
+        if value > u32::from(u16::MAX) {
+            return None;
+        }
+    }
+    Some(value as u16)
 }
 
 #[derive(Clone, Copy)]
@@ -180,11 +463,7 @@ pub(crate) enum CommonParse {
 }
 
 pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
-    if input
-        .as_bytes()
-        .iter()
-        .any(|byte| matches!(byte, b'\t' | b'\n' | b'\r'))
-    {
+    if memchr3(b'\t', b'\n', b'\r', input.as_bytes()).is_some() {
         return CommonParse::Unsupported;
     }
     let (scheme, scheme_type, authority_start) = if input.starts_with("http://") {
@@ -249,27 +528,30 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
         };
     }
 
-    let (host, host_type) = if let Some(address) = raw_host
+    let (host, host_type): (Cow<'_, str>, HostType) = if let Some(address) = raw_host
         .strip_prefix('[')
         .and_then(|host| host.strip_suffix(']'))
     {
         let Ok(address) = address.parse::<Ipv6Addr>() else {
             return CommonParse::Invalid;
         };
-        (format!("[{address}]"), HostType::IPV6)
+        (Cow::Owned(format!("[{address}]")), HostType::IPV6)
     } else if special {
         let Some(host) = normalize_special_host(raw_host) else {
             return CommonParse::Invalid;
         };
-        host
+        (Cow::Owned(host.0), host.1)
     } else {
         if raw_host.bytes().any(is_forbidden_opaque_host_byte) {
             return CommonParse::Invalid;
         }
-        (
-            utf8_percent_encode(raw_host, CONTROLS).to_string(),
-            HostType::Domain,
-        )
+        let host =
+            if raw_host.is_ascii() && raw_host.bytes().all(|byte| byte > 0x1f && byte != 0x7f) {
+                Cow::Borrowed(raw_host)
+            } else {
+                Cow::Owned(utf8_percent_encode(raw_host, CONTROLS).to_string())
+            };
+        (host, HostType::Domain)
     };
 
     let port = match raw_port {
@@ -329,7 +611,7 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
     let host_end = buffer.len();
     if let Some(port) = port {
         buffer.push(':');
-        buffer.push_str(&port.to_string());
+        push_u16_decimal(&mut buffer, port);
     }
     let pathname_start = buffer.len();
     if raw_path.is_empty() && special {
@@ -392,6 +674,9 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
 }
 
 pub(crate) fn normalize_special_host(raw_host: &str) -> Option<(String, HostType)> {
+    if raw_host.is_empty() {
+        return None;
+    }
     if let Some(address) = raw_host
         .strip_prefix('[')
         .and_then(|host| host.strip_suffix(']'))
@@ -400,9 +685,16 @@ pub(crate) fn normalize_special_host(raw_host: &str) -> Option<(String, HostType
         return Some((format!("[{address}]"), HostType::IPV6));
     }
 
-    if raw_host.is_ascii() && !raw_host.contains('%') && ends_in_number(raw_host.as_bytes()) {
-        let address = parse_ipv4(raw_host)?;
-        return Some((Ipv4Addr::from(address).to_string(), HostType::IPV4));
+    if raw_host.is_ascii() && !raw_host.contains('%') {
+        if ends_in_number(raw_host.as_bytes()) {
+            let address = parse_ipv4(raw_host)?;
+            return Some((Ipv4Addr::from(address).to_string(), HostType::IPV4));
+        }
+        if is_simple_domain_case_insensitive(raw_host.as_bytes()) {
+            let mut host = String::from(raw_host);
+            host.make_ascii_lowercase();
+            return Some((host, HostType::Domain));
+        }
     }
 
     let decoded = percent_decode_str(raw_host).decode_utf8().ok()?;
@@ -451,11 +743,7 @@ pub(crate) fn parse_opaque_absolute(input: &str) -> Option<FastPath> {
     {
         return None;
     }
-    if input
-        .as_bytes()
-        .iter()
-        .any(|byte| matches!(byte, b'\t' | b'\n' | b'\r'))
-    {
+    if memchr3(b'\t', b'\n', b'\r', input.as_bytes()).is_some() {
         return None;
     }
     let scheme_type = SchemeType::NotSpecial;
@@ -711,10 +999,14 @@ fn ends_in_number(host: &[u8]) -> bool {
 }
 
 fn parse_ipv4(input: &str) -> Option<u32> {
-    let input = input.strip_suffix('.').unwrap_or(input);
+    parse_ipv4_bytes(input.as_bytes())
+}
+
+fn parse_ipv4_bytes(input: &[u8]) -> Option<u32> {
+    let input = input.strip_suffix(b".").unwrap_or(input);
     let mut numbers = [0_u64; 4];
     let mut count = 0_usize;
-    for part in input.split('.') {
+    for part in input.split(|byte| *byte == b'.') {
         if part.is_empty() || count == numbers.len() {
             return None;
         }
@@ -736,13 +1028,14 @@ fn parse_ipv4(input: &str) -> Option<u32> {
     u32::try_from(value).ok()
 }
 
-fn parse_ipv4_number(input: &str) -> Option<u64> {
+#[inline]
+fn parse_ipv4_number(input: &[u8]) -> Option<u64> {
     let (digits, radix) = if let Some(digits) = input
-        .strip_prefix("0x")
-        .or_else(|| input.strip_prefix("0X"))
+        .strip_prefix(b"0x")
+        .or_else(|| input.strip_prefix(b"0X"))
     {
-        (digits, 16)
-    } else if input.len() >= 2 && input.starts_with('0') {
+        (digits, 16_u64)
+    } else if input.len() >= 2 && input.starts_with(b"0") {
         (&input[1..], 8)
     } else {
         (input, 10)
@@ -750,7 +1043,59 @@ fn parse_ipv4_number(input: &str) -> Option<u64> {
     if digits.is_empty() {
         return Some(0);
     }
-    u64::from_str_radix(digits, radix).ok()
+    let mut value = 0_u64;
+    for &byte in digits {
+        let digit = match byte {
+            b'0'..=b'9' => u64::from(byte - b'0'),
+            b'a'..=b'f' => u64::from(byte - b'a' + 10),
+            b'A'..=b'F' => u64::from(byte - b'A' + 10),
+            _ => return None,
+        };
+        if digit >= radix {
+            return None;
+        }
+        value = value.checked_mul(radix)?.checked_add(digit)?;
+    }
+    Some(value)
+}
+
+#[inline]
+fn push_ipv4(buffer: &mut String, address: u32) {
+    push_u8_decimal(buffer, (address >> 24) as u8);
+    buffer.push('.');
+    push_u8_decimal(buffer, (address >> 16) as u8);
+    buffer.push('.');
+    push_u8_decimal(buffer, (address >> 8) as u8);
+    buffer.push('.');
+    push_u8_decimal(buffer, address as u8);
+}
+
+#[inline]
+fn push_u8_decimal(buffer: &mut String, value: u8) {
+    if value >= 100 {
+        buffer.push(char::from(b'0' + value / 100));
+        buffer.push(char::from(b'0' + (value / 10) % 10));
+    } else if value >= 10 {
+        buffer.push(char::from(b'0' + value / 10));
+    }
+    buffer.push(char::from(b'0' + value % 10));
+}
+
+#[inline]
+fn push_u16_decimal(buffer: &mut String, mut value: u16) {
+    let mut digits = [0_u8; 5];
+    let mut start = digits.len();
+    loop {
+        start -= 1;
+        digits[start] = b'0' + (value % 10) as u8;
+        value /= 10;
+        if value == 0 {
+            break;
+        }
+    }
+    for digit in &digits[start..] {
+        buffer.push(char::from(*digit));
+    }
 }
 
 fn append_normalized_path(buffer: &mut String, raw_path: &str) {
