@@ -200,6 +200,23 @@ fn can_parse_matches_parse() {
             );
         }
     }
+
+    let source = "tests/wpt/verifydnslength_tests.json";
+    let document = read_json(source);
+    let entries = document
+        .as_array()
+        .unwrap_or_else(|| panic!("{source} root is not an array"));
+    for (index, entry) in entries.iter().enumerate() {
+        if entry.is_string() {
+            continue;
+        }
+        let input = string(object(entry, "DNS length entry"), "input");
+        assert_eq!(
+            Url::can_parse(input, None),
+            Url::parse(input, None).is_ok(),
+            "{source}:{index}: input={input:?}"
+        );
+    }
 }
 
 #[test]

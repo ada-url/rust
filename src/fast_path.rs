@@ -196,7 +196,24 @@ pub(crate) fn can_parse_special_absolute(input: &str) -> Option<bool> {
         return Some(!special);
     }
 
-    if special && memchr(b'\\', authority_tail).is_some_and(|index| index < authority_len) {
+    if special {
+        let mut simple_domain = true;
+        for &byte in authority {
+            if !(byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_')) {
+                simple_domain = false;
+                break;
+            }
+        }
+        if simple_domain {
+            return if ends_in_number(authority) {
+                Some(parse_ipv4_bytes(authority).is_some())
+            } else {
+                Some(true)
+            };
+        }
+    }
+
+    if special && memchr(b'\\', authority).is_some() {
         return None;
     }
 
@@ -229,9 +246,6 @@ pub(crate) fn can_parse_special_absolute(input: &str) -> Option<bool> {
         });
     if host.is_empty() {
         return Some(!special && port.is_none());
-    }
-    if host.len() > 253 {
-        return Some(false);
     }
     if let Some(port) = port {
         if port.is_empty() {
