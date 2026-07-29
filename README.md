@@ -1,11 +1,11 @@
 # WHATWG URL parser for Rust
 
 Fast, memory-safe [WHATWG URL Specification](https://url.spec.whatwg.org)
-compliant URL parser for Rust. The parser is implemented in Rust and forbids
-unsafe code in the library.
+compliant URL parser for Rust. The parser is implemented in Rust and keeps
+unsafe code confined to audited, bounds-checked SIMD byte-search kernels.
 
-The crate runs Ada's current URL, setter, IDNA, percent-encoding, DNS-length,
-and URLPattern conformance fixtures. It supports the relevant
+The crate runs Ada's current URL, setter, IDNA, percent-encoding, and DNS-length
+conformance fixtures. It supports the relevant
 [Unicode Technical Standard](https://www.unicode.org/reports/tr46/#ToUnicode)
 through UTS #46 processing.
 
@@ -22,9 +22,6 @@ default; set `default-features = false` for `no_std` plus `alloc`.
 
 **serde:** Implements `Serialize` and `Deserialize` for `Url` and
 `UrlSearchParams`. This feature is disabled by default and enables `std`.
-
-**url-pattern:** Exposes the WHATWG `UrlPattern` API. This feature is disabled
-by default.
 
 The former `bundled` and `libcpp` feature names remain as no-ops so existing
 downstream manifests continue to resolve after the move away from the C++ build.
@@ -77,7 +74,7 @@ just all
 **Skipping features:**
 
 ```sh
-just all --skip=url-pattern
+just all --skip=serde
 ```
 
 ## License

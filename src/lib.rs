@@ -4,12 +4,14 @@
 //! compact byte offsets, so component access is allocation-free.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
+mod bytes;
 mod components;
 mod encoding;
 mod error;
@@ -17,13 +19,11 @@ mod fast_path;
 mod idna;
 mod search_params;
 mod url;
-#[cfg(feature = "url-pattern")]
-mod url_pattern;
 
 pub use components::{Components, HostType, SchemeType, UrlComponents};
 pub use encoding::{PercentEncodeSet, percent_decode, percent_encode};
 pub use error::{ParseError, ParseErrorKind};
-pub use idna::{Idna, domain_to_ascii, domain_to_unicode};
+pub use idna::{Idna, IdnaError, domain_to_ascii, domain_to_unicode};
 pub use search_params::{
     UrlSearchParams, UrlSearchParamsEntry, UrlSearchParamsEntryIterator,
     UrlSearchParamsKeyIterator, UrlSearchParamsValueIterator,
@@ -31,11 +31,6 @@ pub use search_params::{
 #[cfg(feature = "std")]
 pub use url::href_from_file;
 pub use url::{Url, can_parse, get_max_input_length, parse, set_max_input_length};
-#[cfg(feature = "url-pattern")]
-pub use url_pattern::{
-    RegexSyntax, UrlPattern, UrlPatternComponentResult, UrlPatternError, UrlPatternInit,
-    UrlPatternMatchInput, UrlPatternOptions, UrlPatternResult,
-};
 
 use core::fmt;
 

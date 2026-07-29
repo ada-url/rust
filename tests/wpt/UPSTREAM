@@ -12,6 +12,3 @@ Files:
 - tests/wpt/percent-encoding.json
 - tests/wpt/urltestdata-javascript-only.json
 - tests/wpt/verifydnslength_tests.json
-- tests/wpt/urlpatterntestdata.json
-- tests/wpt/urlpattern-compare-test-data.json
-- tests/wpt/urlpattern-generate-test-data.json

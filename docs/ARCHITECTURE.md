@@ -8,9 +8,7 @@ The native Rust implementation is mapped against `ada-url/ada` commit
 1. URL parsing, serialization, base resolution, file URLs, opaque URLs, IPv4,
    IPv6, IDNA, origin calculation, setters, and configurable length limits.
 2. URLSearchParams, including stable UTF-16 sorting semantics.
-3. URLPattern behind an optional feature and a denial-of-service-resistant regex
-   provider.
-4. The upstream WPT, Ada-extra, UTS #46, setter, and URLPattern fixtures.
+3. The upstream WPT, Ada-extra, UTS #46, and setter fixtures.
 
 The C ABI and the multi-string `ada::url` representation are not ported. Rust's
 public `Url` corresponds to `ada::url_aggregator`.
@@ -37,40 +35,36 @@ branches are a net win on the corpus.
    URLs, common authority URLs, opaque URLs, WHATWG IPv4/IPv6 hosts, and direct
    references. Inputs that can be copied directly avoid intermediate
    allocations.
-3. Delegate uncommon states to the memory-safe Rust `url` parser.
-4. Apply Ada-compatible normalization for file, opaque, host, and setter edge
-   cases that differ from the fallback parser.
-5. Enforce normalized-output length, derive compact offsets, validate them,
+3. Continue through the in-tree state handlers for file, opaque, host, base
+   resolution, and setter edge cases.
+4. Enforce normalized-output length, derive compact offsets, validate them,
    and publish the immutable `Url`.
 
-Uncommon states not yet covered natively use the memory-safe Rust `url` parser.
-The fallback is a correctness bridge; native coverage is expanded only with
-fixture and differential proof.
+The runtime parser, IDNA implementation, percent encoder, and delimiter scans
+are dependency-free. The `url` crate remains a dev-only differential benchmark
+and test oracle.
 
 ## Scanning and SIMD
 
-Character properties are compile-time byte lookup tables. `memchr`,
-`memchr2`, and `memchr3` provide maintained runtime-dispatched SIMD for
-delimiter scans on x86-64, AArch64, and WebAssembly.
+Character properties are compile-time byte lookup tables. The in-tree byte
+scanners use 16-byte NEON on AArch64 and SSE2 on x86-64, matching Ada's
+architecture-specific delimiter scans. Short inputs, unsupported targets, and
+Miri use a word-at-a-time scalar implementation.
 
-The crate currently forbids unsafe code, so handwritten intrinsics are not part
-of the library. A future intrinsic implementation is admitted only as a
-separate, audited dependency when a reproducible benchmark beats the safe
-baseline. Each such kernel must:
+The crate denies unsafe code everywhere except the architecture-specific
+scanner module. Each kernel:
 
-- live in an architecture-specific module with a safe public wrapper;
-- use runtime feature detection unless enabled at compile time;
-- never read outside the source allocation;
-- have a byte-for-byte scalar oracle and randomized differential tests;
-- document every unsafe operation and compile independently with
-  `unsafe_op_in_unsafe_fn` denied while preserving `#![forbid(unsafe_code)]` in
-  `ada-url`.
+- lives in an architecture-specific module with a safe wrapper;
+- uses only target-baseline instructions (NEON on AArch64 and SSE2 on x86-64);
+- never reads outside the source allocation;
+- has a byte-for-byte scalar oracle and randomized differential tests;
+- documents every unsafe operation and compiles with
+  `unsafe_op_in_unsafe_fn` denied.
 
 ## Correctness gates
 
 - 100% of pinned `urltestdata.json`, Ada extras, long-input tests, setters,
-  percent-encoding, `IdnaTestV2`, `toascii`, URLSearchParams, and URLPattern
-  fixtures.
+  percent-encoding, `IdnaTestV2`, `toascii`, and URLSearchParams fixtures.
 - Mutation failures are transactional.
 - All offsets validate after every parse and setter in debug/test builds.
 - `cargo test`, Clippy, rustfmt, docs, Miri for safe targets, and fuzz smoke
@@ -89,7 +83,7 @@ Track:
 - p50/p95/p99 by input family;
 - allocations and allocated bytes per URL;
 - `parse`, `can_parse`, component access, setters, IDNA, IPv4, percent
-  encoding, SearchParams, and URLPattern separately;
+  encoding, and SearchParams separately;
 - portable binaries and `target-cpu=native` binaries.
 
 A performance result is accepted only when normalized outputs match and the

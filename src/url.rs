@@ -18,13 +18,13 @@ use core::{
 #[cfg(feature = "std")]
 use std::path::Path;
 
-use memchr::{memchr, memchr2};
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
-use url::{Host, Position, Url as BackendUrl};
-
+#[cfg(feature = "std")]
+use crate::encoding::append_file_path_segment;
 use crate::{
     ParseUrlError,
+    bytes::{find_byte as memchr, find_byte2 as memchr2},
     components::{Components, HostType, SchemeType, UrlComponents},
+    encoding::{PercentEncodeSet, append_percent_encoded, utf8_percent_encode},
     error::{ParseError, ParseErrorKind},
     fast_path,
     search_params::UrlSearchParams,
@@ -33,26 +33,11 @@ use crate::{
 const FLAG_OPAQUE_PATH: u8 = 1 << 0;
 const FLAG_AUTHORITY: u8 = 1 << 1;
 
-const PATH_ENCODE_SET: &AsciiSet = &CONTROLS
-    .add(b' ')
-    .add(b'"')
-    .add(b'#')
-    .add(b'<')
-    .add(b'>')
-    .add(b'?')
-    .add(b'^')
-    .add(b'`')
-    .add(b'{')
-    .add(b'}');
-const SPECIAL_QUERY_ENCODE_SET: &AsciiSet = &CONTROLS
-    .add(b' ')
-    .add(b'"')
-    .add(b'#')
-    .add(b'<')
-    .add(b'>')
-    .add(b'\'');
-const QUERY_ENCODE_SET: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>');
-const FRAGMENT_ENCODE_SET: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+const PATH_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::Path;
+const SPECIAL_QUERY_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::SpecialQuery;
+const QUERY_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::Query;
+const FRAGMENT_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::Fragment;
+const USERINFO_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::UserInfo;
 
 static MAX_INPUT_LENGTH: AtomicU32 = AtomicU32::new(u32::MAX);
 
@@ -79,29 +64,86 @@ impl Url {
     /// Parses `input`, optionally resolving it against an already parsed base.
     pub fn parse_with_url_base(input: &str, base: Option<&Self>) -> Result<Self, ParseError> {
         check_raw_length(input)?;
-
         if base.is_none()
             && input.len() <= 32
             && let Some(parsed) = fast_path::parse_bare_special(input)
         {
             return Self::from_fast_path(parsed);
         }
-        if base.is_none() && might_be_explicit_file(input) {
-            if let Some(parsed) = fast_path::parse_normalized_file(input) {
+        if base.is_none()
+            && let Some(parsed) = fast_path::parse_normalized_file(input)
+        {
+            return Self::from_fast_path(parsed);
+        }
+        if let Some(parsed) = fast_path::parse(input) {
+            return Self::from_fast_path(parsed);
+        }
+        // Already-normalized non-special authority URLs do not need the
+        // cleanup and malformed-special probes below. Keep invalid/unsupported
+        // inputs on the general path because cleanup can still make them valid.
+        let has_outer_c0 = input.as_bytes().first().is_some_and(|byte| *byte <= b' ')
+            || input.as_bytes().last().is_some_and(|byte| *byte <= b' ');
+        if !has_outer_c0
+            && let fast_path::CommonParse::Parsed(parsed) = fast_path::parse_common_absolute(input)
+        {
+            return Self::from_fast_path(parsed);
+        }
+
+        let input = input.trim_matches(|character: char| character <= '\u{20}');
+        let cleaned = remove_ascii_tab_or_newline(input);
+        let input = cleaned.as_ref();
+
+        if let Some(normalized) = normalize_scheme_case(input) {
+            return Self::parse_with_url_base(&normalized, base);
+        }
+        if base.is_none()
+            && input.len() <= 32
+            && let Some(parsed) = fast_path::parse_bare_special(input)
+        {
+            return Self::from_fast_path(parsed);
+        }
+        if might_be_explicit_file(input) {
+            if base.is_none()
+                && let Some(parsed) = fast_path::parse_normalized_file(input)
+            {
                 return Self::from_fast_path(parsed);
             }
-            if let Some(parsed) = parse_explicit_file(input, None) {
+            if let Some(parsed) = parse_explicit_file(input, base) {
                 return parsed;
             }
         }
         if let Some(parsed) = fast_path::parse(input) {
             return Self::from_fast_path(parsed);
         }
-        let opaque_candidate = memchr(b':', input.as_bytes())
-            .and_then(|colon| input.as_bytes().get(colon + 1))
-            .is_some_and(|byte| *byte != b'/');
+        let opaque_candidate = memchr(b':', input.as_bytes()).is_some_and(|colon| {
+            input
+                .as_bytes()
+                .get(colon + 1)
+                .is_none_or(|byte| *byte != b'/')
+        });
         if opaque_candidate && let Some(parsed) = fast_path::parse_opaque_absolute(input) {
             return Self::from_fast_path(parsed);
+        }
+        if let Some(normalized) = normalize_special_backslashes(input) {
+            return Self::parse_with_url_base(&normalized, base);
+        }
+        if let Some(base) = base
+            && base.scheme_type != SchemeType::File
+            && base.is_special()
+            && let Some(colon) = memchr(b':', input.as_bytes())
+            && input[..colon].eq_ignore_ascii_case(base.scheme())
+        {
+            let remainder = &input[colon + 1..];
+            let leading = remainder
+                .bytes()
+                .take_while(|byte| matches!(byte, b'/' | b'\\'))
+                .count();
+            if leading < 2 {
+                return Self::parse_with_url_base(remainder, Some(base));
+            }
+        }
+        if let Some(normalized) = normalize_malformed_special_absolute(input) {
+            return Self::parse_with_url_base(&normalized, None);
         }
         match fast_path::parse_common_absolute(input) {
             fast_path::CommonParse::Parsed(parsed) => return Self::from_fast_path(parsed),
@@ -110,14 +152,15 @@ impl Url {
             }
             fast_path::CommonParse::Unsupported => {}
         }
-        let parsed = if let Some(base) = base {
-            if might_be_explicit_file(input)
-                && let Some(parsed) = parse_explicit_file(input, Some(base))
-            {
-                return parsed;
-            }
+        if let Some(parsed) = fast_path::parse_non_special_hierarchical_absolute(input) {
+            return Self::from_fast_path(parsed);
+        }
+        if let Some(base) = base {
             if let Some(parsed) = resolve_simple_reference(input, base) {
                 return parsed;
+            }
+            if base.has_opaque_path() {
+                return Err(ParseError::new(ParseErrorKind::InvalidUrl));
             }
             if let Some(parsed) = resolve_authority_reference(input, base) {
                 return parsed;
@@ -128,33 +171,14 @@ impl Url {
             if let Some(parsed) = resolve_file_reference(input, base) {
                 return parsed;
             }
-            if let Some(parsed) = resolve_non_special_backslash(input, base) {
-                return parsed;
-            }
             if let Some(parsed) = resolve_custom_file_base(input, base) {
                 return parsed;
             }
             if let Some(parsed) = resolve_common_path_reference(input, base) {
                 return parsed;
             }
-            let mut backend_base = base
-                .to_backend()
-                .map_err(|_| ParseError::new(ParseErrorKind::InvalidBase))?;
-            if let Some(parsed) = resolve_file_root(input, &mut backend_base) {
-                return Self::from_backend(parsed);
-            }
-            let normalized_reference = normalize_special_authority_reference(input, base);
-            let input = normalized_reference.as_deref().unwrap_or(input);
-            let mut parsed = BackendUrl::options()
-                .base_url(Some(&backend_base))
-                .parse(input)
-                .map_err(|_| ParseError::new(ParseErrorKind::InvalidUrl))?;
-            normalize_non_file_drive_parent(input, base, &mut parsed);
-            parsed
-        } else {
-            BackendUrl::parse(input).map_err(|_| ParseError::new(ParseErrorKind::InvalidUrl))?
-        };
-        Self::from_backend(parsed)
+        }
+        Err(ParseError::new(ParseErrorKind::InvalidUrl))
     }
 
     #[inline]
@@ -182,36 +206,7 @@ impl Url {
         check_raw_length(base).map_err(|_| ParseError::new(ParseErrorKind::InvalidBase))?;
         let parsed_base = Self::parse_with_url_base(base, None)
             .map_err(|_| ParseError::new(ParseErrorKind::InvalidBase))?;
-        if let Some(parsed) = parse_explicit_file(input, Some(&parsed_base)) {
-            return parsed;
-        }
-        if let Some(parsed) = resolve_file_reference(input, &parsed_base) {
-            return parsed;
-        }
-        if let Some(parsed) = resolve_non_special_backslash(input, &parsed_base) {
-            return parsed;
-        }
-        if let Some(custom_base) = parse_absolute_file_with_drive_host(base) {
-            let custom_base =
-                custom_base.map_err(|_| ParseError::new(ParseErrorKind::InvalidBase))?;
-            if let Some(parsed) = resolve_custom_file_base(input, &custom_base) {
-                return parsed;
-            }
-        }
-        let mut backend_base = parsed_base
-            .to_backend()
-            .map_err(|_| ParseError::new(ParseErrorKind::InvalidBase))?;
-        if let Some(parsed) = resolve_file_root(input, &mut backend_base) {
-            return Self::from_backend(parsed);
-        }
-        let normalized_reference = normalize_special_authority_reference(input, &parsed_base);
-        let input = normalized_reference.as_deref().unwrap_or(input);
-        let mut parsed = BackendUrl::options()
-            .base_url(Some(&backend_base))
-            .parse(input)
-            .map_err(|_| ParseError::new(ParseErrorKind::InvalidUrl))?;
-        normalize_non_file_drive_parent(input, &parsed_base, &mut parsed);
-        Self::from_backend(parsed)
+        Self::parse_with_url_base(input, Some(&parsed_base))
     }
 
     /// Returns whether `input` is parseable, optionally against a string base.
@@ -234,61 +229,6 @@ impl Url {
         }
 
         Self::parse_with_base(input, base).is_ok()
-    }
-
-    fn from_backend(mut backend: BackendUrl) -> Result<Self, ParseError> {
-        normalize_file_drive_letter(&mut backend);
-        normalize_file_localhost(&mut backend);
-        normalize_opaque_trailing_space(&mut backend);
-        normalize_hierarchical_path_caret(&mut backend);
-        let protocol_end = backend.scheme().len() + 1;
-        let before_username = backend[..Position::BeforeUsername].len();
-        let username_end = backend[..Position::AfterUsername].len();
-        let host_start = backend[..Position::BeforeHost].len();
-        let host_end = backend[..Position::AfterHost].len();
-        let pathname_start = backend[..Position::BeforePath].len();
-        let search_start = backend
-            .query()
-            .is_some()
-            .then(|| backend[..Position::AfterPath].len());
-        let hash_start = backend
-            .fragment()
-            .is_some()
-            .then(|| backend[..Position::AfterQuery].len());
-        let authority = before_username == protocol_end + 2;
-        let scheme_type = SchemeType::from_scheme(backend.scheme());
-        let host_type = match backend.host() {
-            Some(Host::Ipv4(_)) => HostType::IPV4,
-            Some(Host::Ipv6(_)) => HostType::IPV6,
-            Some(Host::Domain(_)) | None => HostType::Domain,
-        };
-        let opaque_path = backend.cannot_be_a_base();
-        let port = backend.port();
-        let buffer = String::from(backend);
-        check_normalized_length(buffer.len())?;
-
-        let components = Components::new(
-            to_u32(protocol_end)?,
-            to_u32(username_end)?,
-            to_u32(host_start)?,
-            to_u32(host_end)?,
-            port,
-            to_u32(pathname_start)?,
-            search_start.map(to_u32).transpose()?,
-            hash_start.map(to_u32).transpose()?,
-        );
-        if !components.validate(buffer.len()) {
-            return Err(ParseError::new(ParseErrorKind::InvalidUrl));
-        }
-
-        Ok(Self {
-            components,
-            buffer,
-            scheme_type,
-            host_type,
-            flags: (u8::from(opaque_path) * FLAG_OPAQUE_PATH)
-                | (u8::from(authority) * FLAG_AUTHORITY),
-        })
     }
 
     fn from_file_parts(host: &str, host_type: HostType, suffix: &str) -> Result<Self, ParseError> {
@@ -328,17 +268,6 @@ impl Url {
         })
     }
 
-    #[inline]
-    fn to_backend(&self) -> Result<BackendUrl, ParseError> {
-        BackendUrl::parse(&self.buffer).map_err(|_| ParseError::new(ParseErrorKind::InvalidUrl))
-    }
-
-    fn replace_backend(&mut self, backend: BackendUrl) -> Result<(), ParseError> {
-        let replacement = Self::from_backend(backend)?;
-        *self = replacement;
-        Ok(())
-    }
-
     /// Replaces the entire URL. Failure leaves `self` unchanged.
     fn set_href_value(&mut self, input: &str) -> Result<(), ParseError> {
         let replacement = Self::parse_with_url_base(input, None)?;
@@ -350,30 +279,79 @@ impl Url {
     fn set_protocol_value(&mut self, protocol: &str) -> Result<(), ParseError> {
         let cleaned = remove_ascii_tab_or_newline(protocol);
         let protocol = cleaned.as_ref();
-        let mut backend = self.to_backend()?;
         let scheme = protocol.split(':').next().unwrap_or(protocol);
-        backend
-            .set_scheme(scheme)
-            .map_err(|()| ParseError::new(ParseErrorKind::InvalidSetter))?;
-        self.replace_backend(backend)
+        if scheme.is_empty()
+            || !scheme.as_bytes()[0].is_ascii_alphabetic()
+            || !scheme
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
+        {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
+        }
+        let new_scheme_type = SchemeType::from_scheme(scheme);
+        if self.scheme_type.is_special() != new_scheme_type.is_special()
+            || (new_scheme_type == SchemeType::File
+                && (self.has_credentials() || self.has_password() || !self.port().is_empty()))
+            || (self.scheme_type == SchemeType::File
+                && new_scheme_type != SchemeType::File
+                && self.hostname().is_empty())
+        {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
+        }
+        let mut candidate = String::with_capacity(self.buffer.len() + scheme.len());
+        candidate.extend(
+            scheme
+                .chars()
+                .map(|character| character.to_ascii_lowercase()),
+        );
+        candidate.push(':');
+        candidate.push_str(&self.buffer[self.components.protocol_end as usize..]);
+        let replacement = Self::parse_with_url_base(&candidate, None)
+            .map_err(|_| ParseError::new(ParseErrorKind::InvalidSetter))?;
+        *self = replacement;
+        Ok(())
     }
 
     /// Changes the username. Failure leaves `self` unchanged.
     fn set_username_value(&mut self, username: &str) -> Result<(), ParseError> {
-        let mut backend = self.to_backend()?;
-        backend
-            .set_username(username)
-            .map_err(|()| ParseError::new(ParseErrorKind::InvalidSetter))?;
-        self.replace_backend(backend)
+        if !self.has_authority() || self.scheme_type == SchemeType::File {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
+        }
+        let password = String::from(self.password());
+        self.replace_credentials(username, Some(&password))
     }
 
     /// Changes the password. Failure leaves `self` unchanged.
     fn set_password_value(&mut self, password: &str) -> Result<(), ParseError> {
-        let mut backend = self.to_backend()?;
-        backend
-            .set_password(Some(password))
-            .map_err(|()| ParseError::new(ParseErrorKind::InvalidSetter))?;
-        self.replace_backend(backend)
+        if !self.has_authority() || self.scheme_type == SchemeType::File {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
+        }
+        let username = String::from(self.username());
+        self.replace_credentials(&username, Some(password))
+    }
+
+    fn replace_credentials(
+        &mut self,
+        username: &str,
+        password: Option<&str>,
+    ) -> Result<(), ParseError> {
+        let authority_start = self.components.protocol_end as usize + 2;
+        let mut candidate = String::with_capacity(self.buffer.len() + username.len() + 8);
+        candidate.push_str(&self.buffer[..authority_start]);
+        append_percent_encoded(&mut candidate, username, USERINFO_ENCODE_SET);
+        let password = password.filter(|password| !password.is_empty());
+        if let Some(password) = password {
+            candidate.push(':');
+            append_percent_encoded(&mut candidate, password, USERINFO_ENCODE_SET);
+        }
+        if !username.is_empty() || password.is_some() {
+            candidate.push('@');
+        }
+        candidate.push_str(&self.buffer[self.components.host_start as usize..]);
+        let replacement = Self::parse_with_url_base(&candidate, None)
+            .map_err(|_| ParseError::new(ParseErrorKind::InvalidSetter))?;
+        *self = replacement;
+        Ok(())
     }
 
     /// Changes the host and optional port. Failure leaves `self` unchanged.
@@ -389,49 +367,7 @@ impl Url {
         if hostname.eq_ignore_ascii_case("xn--") && port.is_none() {
             return self.replace_hostname_serialized("xn--");
         }
-        if !self.has_authority() && !self.has_opaque_path() {
-            return self.install_authority(hostname, port);
-        }
-        let fallback_domain = self
-            .is_special()
-            .then(|| fast_path::normalize_special_host(hostname))
-            .flatten()
-            .and_then(|(hostname, host_type)| (host_type == HostType::Domain).then_some(hostname));
-        let mut backend = match self.to_backend() {
-            Ok(backend) => backend,
-            Err(_) if fallback_domain.is_some() => {
-                self.replace_hostname_serialized(fallback_domain.as_deref().unwrap_or(""))?;
-                return port.map_or(Ok(()), |port| self.set_port_value(port));
-            }
-            Err(error) => return Err(error),
-        };
-        let hostname = if self.scheme_type == SchemeType::File && hostname.is_empty() {
-            None
-        } else {
-            Some(hostname)
-        };
-        if backend.set_host(hostname).is_err() {
-            let Some(normalized) = fallback_domain else {
-                return Err(ParseError::new(ParseErrorKind::InvalidSetter));
-            };
-            self.replace_hostname_serialized(&normalized)?;
-            return port.map_or(Ok(()), |port| self.set_port_value(port));
-        }
-        if let Some(port) = port {
-            let digits = port
-                .as_bytes()
-                .iter()
-                .take_while(|byte| byte.is_ascii_digit())
-                .count();
-            if digits == 0 {
-                return self.replace_backend(backend);
-            }
-            let port = port[..digits].parse::<u16>().ok();
-            backend
-                .set_port(port)
-                .map_err(|()| ParseError::new(ParseErrorKind::InvalidSetter))?;
-        }
-        self.replace_backend(backend)
+        self.replace_host_from_setter(hostname, port, false)
     }
 
     /// Changes only the hostname, preserving the port.
@@ -450,36 +386,62 @@ impl Url {
         if hostname.eq_ignore_ascii_case("xn--") {
             return self.replace_hostname_serialized("xn--");
         }
-        if !self.has_authority() && !self.has_opaque_path() {
-            return self.install_authority(hostname, None);
+        self.replace_host_from_setter(hostname, None, true)
+    }
+
+    fn replace_host_from_setter(
+        &mut self,
+        hostname: &str,
+        supplied_port: Option<&str>,
+        hostname_only: bool,
+    ) -> Result<(), ParseError> {
+        if self.has_opaque_path() {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
         }
-        let fallback_domain = self
-            .is_special()
-            .then(|| fast_path::normalize_special_host(hostname))
-            .flatten()
-            .and_then(|(hostname, host_type)| (host_type == HostType::Domain).then_some(hostname));
-        let mut backend = match self.to_backend() {
-            Ok(backend) => backend,
-            Err(_) if fallback_domain.is_some() => {
-                return self.replace_hostname_serialized(fallback_domain.as_deref().unwrap_or(""));
-            }
-            Err(error) => return Err(error),
-        };
-        let hostname = if self.scheme_type == SchemeType::File && hostname.is_empty() {
-            None
+        if hostname.contains('@') {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
+        }
+        let port = if hostname_only || supplied_port.is_none_or(str::is_empty) {
+            self.components.port()
         } else {
-            Some(hostname)
+            let supplied_port = supplied_port.unwrap_or_default();
+            let digits = supplied_port
+                .as_bytes()
+                .iter()
+                .take_while(|byte| byte.is_ascii_digit())
+                .count();
+            if digits == 0 {
+                self.components.port()
+            } else {
+                supplied_port[..digits].parse::<u16>().ok()
+            }
         };
-        if backend.set_host(hostname).is_err() {
-            let Some(normalized) = fallback_domain else {
-                return Err(ParseError::new(ParseErrorKind::InvalidSetter));
-            };
-            return self.replace_hostname_serialized(&normalized);
+        let port = port.filter(|port| Some(*port) != self.scheme_type.default_port());
+
+        let mut candidate =
+            String::with_capacity(self.buffer.len() + hostname.len() + usize::from(!hostname_only));
+        if self.has_authority() {
+            candidate.push_str(&self.buffer[..self.components.host_start as usize]);
+        } else {
+            candidate.push_str(self.protocol());
+            candidate.push_str("//");
         }
-        self.replace_backend(backend)
+        candidate.push_str(hostname);
+        if let Some(port) = port {
+            candidate.push(':');
+            candidate.push_str(&port.to_string());
+        }
+        candidate.push_str(self.pathname_and_later());
+        let replacement = Self::parse_with_url_base(&candidate, None)
+            .map_err(|_| ParseError::new(ParseErrorKind::InvalidSetter))?;
+        *self = replacement;
+        Ok(())
     }
 
     fn replace_hostname_serialized(&mut self, hostname: &str) -> Result<(), ParseError> {
+        if !self.has_authority() {
+            return self.replace_host_from_setter(hostname, None, true);
+        }
         let start = self.components.host_start as usize;
         let end = self.components.host_end as usize;
         let difference = isize::try_from(hostname.len())
@@ -489,7 +451,6 @@ impl Url {
         let mut buffer = self.buffer.clone();
         buffer.replace_range(start..end, hostname);
         check_normalized_length(buffer.len())?;
-
         let components = Components::new(
             self.components.protocol_end,
             self.components.username_end,
@@ -512,66 +473,6 @@ impl Url {
         self.buffer = buffer;
         self.components = components;
         self.host_type = HostType::Domain;
-        Ok(())
-    }
-
-    fn install_authority(&mut self, hostname: &str, port: Option<&str>) -> Result<(), ParseError> {
-        let candidate = BackendUrl::parse(&format!("{}//{hostname}/", self.protocol()))
-            .map_err(|_| ParseError::new(ParseErrorKind::InvalidSetter))?;
-        let normalized_host = String::from(&candidate[Position::BeforeHost..Position::AfterHost]);
-        let host_type = match candidate.host() {
-            Some(Host::Ipv4(_)) => HostType::IPV4,
-            Some(Host::Ipv6(_)) => HostType::IPV6,
-            Some(Host::Domain(_)) => HostType::Domain,
-            None => HostType::Domain,
-        };
-
-        let parsed_port = port.and_then(|port| {
-            let digits = port
-                .as_bytes()
-                .iter()
-                .take_while(|byte| byte.is_ascii_digit())
-                .count();
-            (digits > 0)
-                .then(|| port[..digits].parse::<u16>().ok())
-                .flatten()
-        });
-        let mut buffer = String::new();
-        buffer.push_str(self.protocol());
-        buffer.push_str("//");
-        buffer.push_str(&normalized_host);
-        if let Some(port) =
-            parsed_port.filter(|port| Some(*port) != self.scheme_type.default_port())
-        {
-            buffer.push(':');
-            buffer.push_str(&port.to_string());
-        }
-        let pathname_start = buffer.len();
-        buffer.push_str(self.pathname_and_later());
-        check_normalized_length(buffer.len())?;
-
-        let search_start =
-            memchr(b'?', &buffer.as_bytes()[pathname_start..]).map(|index| pathname_start + index);
-        let hash_start =
-            memchr(b'#', &buffer.as_bytes()[pathname_start..]).map(|index| pathname_start + index);
-        let host_start = self.components.protocol_end as usize + 2;
-        let components = Components::new(
-            self.components.protocol_end,
-            to_u32(host_start)?,
-            to_u32(host_start)?,
-            to_u32(host_start + normalized_host.len())?,
-            parsed_port.filter(|port| Some(*port) != self.scheme_type.default_port()),
-            to_u32(pathname_start)?,
-            search_start.map(to_u32).transpose()?,
-            hash_start.map(to_u32).transpose()?,
-        );
-        if !components.validate(buffer.len()) {
-            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
-        }
-        self.buffer = buffer;
-        self.components = components;
-        self.host_type = host_type;
-        self.flags |= FLAG_AUTHORITY;
         Ok(())
     }
 
@@ -615,6 +516,12 @@ impl Url {
 
     /// Changes or clears the port.
     fn set_port_value(&mut self, port: &str) -> Result<(), ParseError> {
+        if !self.has_authority()
+            || self.scheme_type == SchemeType::File
+            || self.hostname().is_empty()
+        {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
+        }
         let was_empty = port.is_empty();
         let cleaned = remove_ascii_tab_or_newline(port);
         let port = cleaned.as_ref();
@@ -639,11 +546,43 @@ impl Url {
                     .map_err(|_| ParseError::new(ParseErrorKind::InvalidSetter))?,
             )
         };
-        let mut backend = self.to_backend()?;
-        backend
-            .set_port(parsed)
-            .map_err(|()| ParseError::new(ParseErrorKind::InvalidSetter))?;
-        self.replace_backend(backend)
+        let parsed = parsed.filter(|port| Some(*port) != self.scheme_type.default_port());
+        let start = self.components.host_end as usize;
+        let end = self.components.pathname_start as usize;
+        let mut serialized = String::new();
+        if let Some(port) = parsed {
+            serialized.push(':');
+            serialized.push_str(&port.to_string());
+        }
+        let difference = isize::try_from(serialized.len())
+            .ok()
+            .and_then(|new| isize::try_from(end - start).ok().map(|old| new - old))
+            .ok_or_else(|| ParseError::new(ParseErrorKind::TooLong))?;
+        let mut buffer = self.buffer.clone();
+        buffer.replace_range(start..end, &serialized);
+        check_normalized_length(buffer.len())?;
+        let components = Components::new(
+            self.components.protocol_end,
+            self.components.username_end,
+            self.components.host_start,
+            self.components.host_end,
+            parsed,
+            shift_offset(self.components.pathname_start, difference)?,
+            self.components
+                .search_start()
+                .map(|offset| shift_offset(offset, difference))
+                .transpose()?,
+            self.components
+                .hash_start()
+                .map(|offset| shift_offset(offset, difference))
+                .transpose()?,
+        );
+        if !components.validate(buffer.len()) {
+            return Err(ParseError::new(ParseErrorKind::InvalidSetter));
+        }
+        self.buffer = buffer;
+        self.components = components;
+        Ok(())
     }
 
     /// Changes the pathname.
@@ -670,7 +609,6 @@ impl Url {
             *self = replacement;
             return Ok(());
         }
-        let mut backend = self.to_backend()?;
         let pathname = if pathname.is_empty() && (!self.has_authority() || self.is_special()) {
             "/"
         } else {
@@ -680,19 +618,77 @@ impl Url {
         if self.scheme_type == SchemeType::NotSpecial && !self.has_authority() {
             return self.replace_non_special_path(&pathname);
         }
-        backend.set_path(&pathname);
-        self.replace_backend(backend)
+        let later_start = self
+            .components
+            .search_start()
+            .or(self.components.hash_start())
+            .map_or(self.buffer.len(), |offset| offset as usize);
+        let mut candidate = String::with_capacity(self.buffer.len() + pathname.len() + 1);
+        candidate.push_str(&self.buffer[..self.components.pathname_start as usize]);
+        if !pathname.is_empty()
+            && !pathname.starts_with('/')
+            && !(self.is_special() && pathname.starts_with('\\'))
+        {
+            candidate.push('/');
+        }
+        candidate.push_str(&pathname);
+        candidate.push_str(&self.buffer[later_start..]);
+        let replacement = Self::parse_with_url_base(&candidate, None)
+            .map_err(|_| ParseError::new(ParseErrorKind::InvalidSetter))?;
+        *self = replacement;
+        Ok(())
     }
 
     /// Changes or clears the query. An empty input clears it.
     fn set_search_value(&mut self, search: &str) -> Result<(), ParseError> {
-        let mut backend = self.to_backend()?;
-        if search.is_empty() {
-            backend.set_query(None);
+        let cleaned = remove_ascii_tab_or_newline(search);
+        let search = cleaned.as_ref();
+        let path_end = self
+            .components
+            .search_start()
+            .or(self.components.hash_start())
+            .map_or(self.buffer.len(), |offset| offset as usize);
+        let hash = self
+            .components
+            .hash_start()
+            .map(|offset| String::from(&self.buffer[offset as usize..]));
+        let mut buffer = String::with_capacity(self.buffer.len() + search.len() + 1);
+        buffer.push_str(&self.buffer[..path_end]);
+        let search_start = if search.is_empty() {
+            None
         } else {
-            backend.set_query(Some(search.strip_prefix('?').unwrap_or(search)));
-        }
-        self.replace_backend(backend)
+            let start = to_u32(buffer.len())?;
+            buffer.push('?');
+            let value = search.strip_prefix('?').unwrap_or(search);
+            let encode_set = if self.is_special() {
+                SPECIAL_QUERY_ENCODE_SET
+            } else {
+                QUERY_ENCODE_SET
+            };
+            append_percent_encoded(&mut buffer, value, encode_set);
+            Some(start)
+        };
+        let hash_start = hash
+            .map(|hash| {
+                let start = to_u32(buffer.len())?;
+                buffer.push_str(&hash);
+                Ok(start)
+            })
+            .transpose()?;
+        check_normalized_length(buffer.len())?;
+        self.buffer = buffer;
+        self.components = Components::new(
+            self.components.protocol_end,
+            self.components.username_end,
+            self.components.host_start,
+            self.components.host_end,
+            self.components.port(),
+            self.components.pathname_start,
+            search_start,
+            hash_start,
+        );
+        self.trim_opaque_trailing_spaces();
+        Ok(())
     }
 
     /// Replaces the query from serialized URL search parameters.
@@ -702,13 +698,52 @@ impl Url {
 
     /// Changes or clears the fragment. An empty input clears it.
     fn set_hash_value(&mut self, hash: &str) -> Result<(), ParseError> {
-        let mut backend = self.to_backend()?;
-        if hash.is_empty() {
-            backend.set_fragment(None);
+        let cleaned = remove_ascii_tab_or_newline(hash);
+        let hash = cleaned.as_ref();
+        let fragment_start = self
+            .components
+            .hash_start()
+            .map_or(self.buffer.len(), |offset| offset as usize);
+        let mut buffer = String::with_capacity(fragment_start + hash.len() + 1);
+        buffer.push_str(&self.buffer[..fragment_start]);
+        let hash_start = if hash.is_empty() {
+            None
         } else {
-            backend.set_fragment(Some(hash.strip_prefix('#').unwrap_or(hash)));
+            let start = to_u32(buffer.len())?;
+            buffer.push('#');
+            append_percent_encoded(
+                &mut buffer,
+                hash.strip_prefix('#').unwrap_or(hash),
+                FRAGMENT_ENCODE_SET,
+            );
+            Some(start)
+        };
+        check_normalized_length(buffer.len())?;
+        self.buffer = buffer;
+        self.components = Components::new(
+            self.components.protocol_end,
+            self.components.username_end,
+            self.components.host_start,
+            self.components.host_end,
+            self.components.port(),
+            self.components.pathname_start,
+            self.components.search_start(),
+            hash_start,
+        );
+        self.trim_opaque_trailing_spaces();
+        Ok(())
+    }
+
+    fn trim_opaque_trailing_spaces(&mut self) {
+        if !self.has_opaque_path()
+            || self.components.search_start().is_some()
+            || self.components.hash_start().is_some()
+        {
+            return;
         }
-        self.replace_backend(backend)
+        while self.buffer.ends_with(' ') {
+            self.buffer.pop();
+        }
     }
 
     /// Replaces the entire URL.
@@ -1274,12 +1309,98 @@ pub fn get_max_input_length() -> u32 {
 }
 
 /// Converts an absolute filesystem path to a `file:` URL.
-#[cfg(feature = "std")]
+#[cfg(all(
+    feature = "std",
+    any(unix, target_os = "redox", target_os = "wasi", target_os = "hermit")
+))]
 pub fn href_from_file(path: impl AsRef<Path>) -> Result<String, ParseError> {
-    let backend = BackendUrl::from_file_path(path)
-        .map_err(|()| ParseError::new(ParseErrorKind::InvalidUrl))?;
-    check_normalized_length(backend.as_str().len())?;
-    Ok(String::from(backend))
+    let path = path.as_ref();
+    if !path.is_absolute() {
+        return Err(ParseError::new(ParseErrorKind::InvalidUrl));
+    }
+    let mut output = String::from("file://");
+    let mut empty = true;
+    for component in path.components().skip(1) {
+        empty = false;
+        output.push('/');
+        #[cfg(any(unix, target_os = "redox"))]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            append_file_path_segment(&mut output, component.as_os_str().as_bytes());
+        }
+        #[cfg(not(any(unix, target_os = "redox")))]
+        append_file_path_segment(
+            &mut output,
+            component.as_os_str().to_string_lossy().as_bytes(),
+        );
+    }
+    if empty {
+        output.push('/');
+    }
+    check_normalized_length(output.len())?;
+    Ok(output)
+}
+
+/// Converts an absolute Windows filesystem path to a `file:` URL.
+#[cfg(all(feature = "std", windows))]
+pub fn href_from_file(path: impl AsRef<Path>) -> Result<String, ParseError> {
+    use std::path::{Component, Prefix};
+
+    let path = path.as_ref();
+    if !path.is_absolute() {
+        return Err(ParseError::new(ParseErrorKind::InvalidUrl));
+    }
+    let mut components = path.components();
+    let Some(Component::Prefix(prefix)) = components.next() else {
+        return Err(ParseError::new(ParseErrorKind::InvalidUrl));
+    };
+    let mut output = String::from("file://");
+    let mut only_prefix = true;
+    match prefix.kind() {
+        Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => {
+            output.push('/');
+            output.push(char::from(letter));
+            output.push(':');
+        }
+        Prefix::UNC(server, share) | Prefix::VerbatimUNC(server, share) => {
+            let server = server
+                .to_str()
+                .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidUrl))?;
+            let (server, _) = fast_path::normalize_special_host(server)
+                .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidUrl))?;
+            output.push_str(&server);
+            output.push('/');
+            append_file_path_segment(
+                &mut output,
+                share
+                    .to_str()
+                    .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidUrl))?
+                    .as_bytes(),
+            );
+            only_prefix = false;
+        }
+        _ => return Err(ParseError::new(ParseErrorKind::InvalidUrl)),
+    }
+    for component in components {
+        if component == Component::RootDir {
+            continue;
+        }
+        only_prefix = false;
+        output.push('/');
+        append_file_path_segment(
+            &mut output,
+            component
+                .as_os_str()
+                .to_str()
+                .ok_or_else(|| ParseError::new(ParseErrorKind::InvalidUrl))?
+                .as_bytes(),
+        );
+    }
+    if only_prefix {
+        output.push('/');
+    }
+    check_normalized_length(output.len())?;
+    Ok(output)
 }
 
 fn check_raw_length(input: &str) -> Result<(), ParseError> {
@@ -1308,80 +1429,6 @@ fn shift_offset(offset: u32, difference: isize) -> Result<u32, ParseError> {
     offset
         .checked_add_signed(difference)
         .ok_or_else(|| ParseError::new(ParseErrorKind::TooLong))
-}
-
-fn normalize_file_drive_letter(url: &mut BackendUrl) {
-    if url.scheme() != "file" {
-        return;
-    }
-    let path = url.path().as_bytes();
-    if path.len() >= 3
-        && path[0] == b'/'
-        && path[1].is_ascii_alphabetic()
-        && path[2] == b'|'
-        && (path.len() == 3 || path[3] == b'/')
-    {
-        let mut normalized = String::from(url.path());
-        normalized.replace_range(2..3, ":");
-        url.set_path(&normalized);
-    }
-}
-
-fn normalize_file_localhost(url: &mut BackendUrl) {
-    if url.scheme() == "file" && url.host_str() == Some("localhost") {
-        let _ = url.set_host(None);
-    }
-}
-
-fn normalize_opaque_trailing_space(url: &mut BackendUrl) {
-    if !url.cannot_be_a_base()
-        || (!url.path().ends_with(' '))
-        || (url.query().is_none() && url.fragment().is_none())
-    {
-        return;
-    }
-    let mut normalized = String::from(url.path());
-    normalized.pop();
-    normalized.push_str("%20");
-    url.set_path(&normalized);
-}
-
-fn normalize_hierarchical_path_caret(url: &mut BackendUrl) {
-    if url.cannot_be_a_base() || !url.path().contains('^') {
-        return;
-    }
-    url.set_path(&url.path().replace('^', "%5E"));
-}
-
-fn normalize_non_file_drive_parent(input: &str, base: &Url, parsed: &mut BackendUrl) {
-    if input.trim() != ".."
-        || base.scheme_type == SchemeType::File
-        || !base.pathname().ends_with(":/")
-    {
-        return;
-    }
-    let without_slash = &base.pathname()[..base.pathname().len() - 1];
-    let Some(parent_end) = without_slash.rfind('/') else {
-        return;
-    };
-    parsed.set_path(&base.pathname()[..=parent_end]);
-}
-
-fn normalize_special_authority_reference(input: &str, base: &Url) -> Option<String> {
-    if !base.is_special() || base.scheme_type == SchemeType::File || has_url_scheme(input) {
-        return None;
-    }
-    let separator_count = input
-        .bytes()
-        .take_while(|byte| matches!(byte, b'/' | b'\\'))
-        .count();
-    if separator_count < 2 || (separator_count == 2 && input.as_bytes()[..2] == *b"//") {
-        return None;
-    }
-    let mut normalized = String::with_capacity(input.len() - separator_count + 2);
-    normalized.push_str("//");
-    normalized.push_str(&input[separator_count..]);
-    Some(normalized)
 }
 
 fn split_host_port(host: &str) -> (&str, Option<&str>) {
@@ -1426,25 +1473,77 @@ fn remove_ascii_tab_or_newline(input: &str) -> Cow<'_, str> {
     )
 }
 
-fn resolve_non_special_backslash(input: &str, base: &Url) -> Option<Result<Url, ParseError>> {
-    if base.scheme_type != SchemeType::NotSpecial
-        || !base.has_authority()
-        || !input.starts_with('\\')
-        || has_url_scheme(input)
+fn normalize_scheme_case(input: &str) -> Option<String> {
+    let colon = memchr(b':', input.as_bytes())?;
+    let scheme = &input[..colon];
+    if scheme.is_empty()
+        || !scheme.as_bytes()[0].is_ascii_alphabetic()
+        || !scheme
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
+        || !scheme.bytes().any(|byte| byte.is_ascii_uppercase())
     {
         return None;
     }
-    Some((|| {
-        let (path, query, fragment) = split_path_query_fragment(input);
-        let parent_end = base.pathname().rfind('/').map_or(0, |index| index + 1);
-        let mut resolved_path = String::from(&base.pathname()[..parent_end]);
-        resolved_path.push_str(path);
-        let mut backend = base.to_backend()?;
-        backend.set_path(&resolved_path);
-        backend.set_query(query);
-        backend.set_fragment(fragment);
-        Url::from_backend(backend)
-    })())
+    let mut normalized = String::with_capacity(input.len());
+    normalized.extend(
+        scheme
+            .chars()
+            .map(|character| character.to_ascii_lowercase()),
+    );
+    normalized.push_str(&input[colon..]);
+    Some(normalized)
+}
+
+fn normalize_special_backslashes(input: &str) -> Option<String> {
+    let colon = memchr(b':', input.as_bytes())?;
+    if !SchemeType::from_scheme(&input[..colon]).is_special() {
+        return None;
+    }
+    let suffix_end = memchr2(b'?', b'#', &input.as_bytes()[colon + 1..])
+        .map_or(input.len(), |offset| colon + 1 + offset);
+    if !input.as_bytes()[colon + 1..suffix_end].contains(&b'\\') {
+        return None;
+    }
+    let mut normalized = String::with_capacity(input.len());
+    normalized.push_str(&input[..colon + 1]);
+    normalized.extend(
+        input[colon + 1..suffix_end]
+            .chars()
+            .map(|character| if character == '\\' { '/' } else { character }),
+    );
+    normalized.push_str(&input[suffix_end..]);
+    Some(normalized)
+}
+
+fn normalize_malformed_special_absolute(input: &str) -> Option<String> {
+    let colon = memchr(b':', input.as_bytes())?;
+    let scheme = &input[..colon];
+    if !SchemeType::from_scheme(scheme).is_special() {
+        return None;
+    }
+    let remainder = &input[colon + 1..];
+    let leading = remainder
+        .bytes()
+        .take_while(|byte| matches!(byte, b'/' | b'\\'))
+        .count();
+    if leading == 2
+        && remainder
+            .as_bytes()
+            .get(2)
+            .is_none_or(|byte| !matches!(byte, b'/' | b'\\'))
+    {
+        return None;
+    }
+    let authority = &remainder[leading..];
+    if authority.is_empty() {
+        return None;
+    }
+    let mut normalized = String::with_capacity(input.len() + 2);
+    normalized.push_str(scheme);
+    normalized.push_str("://");
+    normalized.push_str(authority);
+    Some(normalized)
 }
 
 fn resolve_simple_reference(input: &str, base: &Url) -> Option<Result<Url, ParseError>> {
@@ -1456,6 +1555,9 @@ fn resolve_simple_reference(input: &str, base: &Url) -> Option<Result<Url, Parse
         return None;
     }
     if input.is_empty() {
+        if base.has_opaque_path() {
+            return Some(Err(ParseError::new(ParseErrorKind::InvalidUrl)));
+        }
         let mut resolved = base.clone();
         if let Some(hash_start) = resolved.components.hash_start() {
             resolved.buffer.truncate(hash_start as usize);
@@ -1482,7 +1584,7 @@ fn resolve_simple_reference(input: &str, base: &Url) -> Option<Result<Url, Parse
             );
             let hash_start = to_u32(buffer.len())?;
             buffer.push('#');
-            buffer.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+            append_percent_encoded(&mut buffer, fragment, FRAGMENT_ENCODE_SET);
             check_normalized_length(buffer.len())?;
             let components = Components::new(
                 base.components.protocol_end,
@@ -1502,6 +1604,9 @@ fn resolve_simple_reference(input: &str, base: &Url) -> Option<Result<Url, Parse
                 flags: base.flags,
             })
         })());
+    }
+    if base.has_opaque_path() {
+        return Some(Err(ParseError::new(ParseErrorKind::InvalidUrl)));
     }
     let query_and_fragment = input.strip_prefix('?')?;
     Some((|| {
@@ -1524,12 +1629,12 @@ fn resolve_simple_reference(input: &str, base: &Url) -> Option<Result<Url, Parse
         } else {
             QUERY_ENCODE_SET
         };
-        buffer.extend(utf8_percent_encode(query, encode_set));
+        append_percent_encoded(&mut buffer, query, encode_set);
         let hash_start = fragment
             .map(|fragment| {
                 let start = to_u32(buffer.len())?;
                 buffer.push('#');
-                buffer.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+                append_percent_encoded(&mut buffer, fragment, FRAGMENT_ENCODE_SET);
                 Ok(start)
             })
             .transpose()?;
@@ -1559,14 +1664,16 @@ fn resolve_authority_reference(input: &str, base: &Url) -> Option<Result<Url, Pa
         return None;
     }
     let special = base.is_special();
-    let mut leading = 0_usize;
-    for byte in input.bytes() {
-        if byte == b'/' || (special && byte == b'\\') {
-            leading += 1;
-        } else {
-            break;
-        }
-    }
+    let leading = if special {
+        input
+            .bytes()
+            .take_while(|byte| matches!(byte, b'/' | b'\\'))
+            .count()
+    } else if input.starts_with("//") {
+        2
+    } else {
+        0
+    };
     if leading < 2 {
         return None;
     }
@@ -1593,7 +1700,6 @@ fn resolve_authority_reference(input: &str, base: &Url) -> Option<Result<Url, Pa
 
 fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, ParseError>> {
     if base.scheme_type == SchemeType::File
-        || !base.has_authority()
         || has_url_scheme(input)
         || input.starts_with("//")
         || (base.is_special() && input.as_bytes().starts_with(b"\\\\"))
@@ -1649,14 +1755,22 @@ fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, 
             if needs_separator || !resolved_path.ends_with('/') {
                 resolved_path.push('/');
             }
-            resolved_path.extend(utf8_percent_encode(segment, PATH_ENCODE_SET));
+            append_percent_encoded(&mut resolved_path, segment, PATH_ENCODE_SET);
             needs_separator = true;
         }
 
-        let pathname_start = base.components.pathname_start as usize;
-        let mut buffer =
-            String::with_capacity(pathname_start + resolved_path.len() + input.len() + 8);
-        buffer.push_str(&base.buffer[..pathname_start]);
+        let mut buffer = String::with_capacity(
+            base.components.pathname_start as usize + resolved_path.len() + input.len() + 8,
+        );
+        if base.has_authority() {
+            buffer.push_str(&base.buffer[..base.components.pathname_start as usize]);
+        } else {
+            buffer.push_str(base.protocol());
+            if resolved_path.starts_with("//") {
+                buffer.push_str("/.");
+            }
+        }
+        let pathname_start = buffer.len();
         buffer.push_str(&resolved_path);
         let search_start = query
             .map(|query| {
@@ -1667,7 +1781,7 @@ fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, 
                 } else {
                     QUERY_ENCODE_SET
                 };
-                buffer.extend(utf8_percent_encode(query, encode_set));
+                append_percent_encoded(&mut buffer, query, encode_set);
                 Ok(start)
             })
             .transpose()?;
@@ -1675,7 +1789,7 @@ fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, 
             .map(|fragment| {
                 let start = to_u32(buffer.len())?;
                 buffer.push('#');
-                buffer.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+                append_percent_encoded(&mut buffer, fragment, FRAGMENT_ENCODE_SET);
                 Ok(start)
             })
             .transpose()?;
@@ -1686,7 +1800,7 @@ fn resolve_common_path_reference(input: &str, base: &Url) -> Option<Result<Url, 
             base.components.host_start,
             base.components.host_end,
             base.components.port(),
-            base.components.pathname_start,
+            to_u32(pathname_start)?,
             search_start,
             hash_start,
         );
@@ -1855,12 +1969,12 @@ fn resolve_normalized_file_relative(input: &str, base: &Url) -> Option<Result<Ur
         let mut buffer = String::with_capacity(prefix_end + parent_end + input.len() + 8);
         buffer.push_str(&base.buffer[..prefix_end]);
         buffer.push_str(&base.pathname()[..parent_end]);
-        buffer.extend(utf8_percent_encode(path, PATH_ENCODE_SET));
+        append_percent_encoded(&mut buffer, path, PATH_ENCODE_SET);
         let search_start = query
             .map(|query| {
                 let start = to_u32(buffer.len())?;
                 buffer.push('?');
-                buffer.extend(utf8_percent_encode(query, SPECIAL_QUERY_ENCODE_SET));
+                append_percent_encoded(&mut buffer, query, SPECIAL_QUERY_ENCODE_SET);
                 Ok(start)
             })
             .transpose()?;
@@ -1868,7 +1982,7 @@ fn resolve_normalized_file_relative(input: &str, base: &Url) -> Option<Result<Ur
             .map(|fragment| {
                 let start = to_u32(buffer.len())?;
                 buffer.push('#');
-                buffer.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+                append_percent_encoded(&mut buffer, fragment, FRAGMENT_ENCODE_SET);
                 Ok(start)
             })
             .transpose()?;
@@ -1945,7 +2059,7 @@ fn parse_file_suffix(input: &str, mut segments: Vec<String>) -> String {
             suffix.push(char::from(segment.as_bytes()[0]));
             suffix.push(':');
         } else {
-            suffix.extend(utf8_percent_encode(segment, PATH_ENCODE_SET));
+            append_percent_encoded(&mut suffix, segment, PATH_ENCODE_SET);
         }
     }
     if suffix.is_empty() {
@@ -2025,11 +2139,11 @@ fn suffix_with_preserved_file_path(input: &str, base: &Url) -> String {
         }
     } else if let Some(query) = query {
         suffix.push('?');
-        suffix.extend(utf8_percent_encode(query, SPECIAL_QUERY_ENCODE_SET));
+        append_percent_encoded(&mut suffix, query, SPECIAL_QUERY_ENCODE_SET);
     }
     if let Some(fragment) = fragment {
         suffix.push('#');
-        suffix.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+        append_percent_encoded(&mut suffix, fragment, FRAGMENT_ENCODE_SET);
     }
     suffix
 }
@@ -2037,11 +2151,11 @@ fn suffix_with_preserved_file_path(input: &str, base: &Url) -> String {
 fn append_query_and_fragment(suffix: &mut String, query: Option<&str>, fragment: Option<&str>) {
     if let Some(query) = query {
         suffix.push('?');
-        suffix.extend(utf8_percent_encode(query, SPECIAL_QUERY_ENCODE_SET));
+        append_percent_encoded(suffix, query, SPECIAL_QUERY_ENCODE_SET);
     }
     if let Some(fragment) = fragment {
         suffix.push('#');
-        suffix.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+        append_percent_encoded(suffix, fragment, FRAGMENT_ENCODE_SET);
     }
 }
 
@@ -2132,14 +2246,8 @@ fn parse_absolute_file_with_drive_host(input: &str) -> Option<Result<Url, ParseE
     Some((|| {
         let (host, host_type) = normalize_file_host(raw_host)?;
         let dummy = format!("file://{suffix}");
-        let mut parsed =
-            BackendUrl::parse(&dummy).map_err(|_| ParseError::new(ParseErrorKind::InvalidUrl))?;
-        normalize_file_drive_letter(&mut parsed);
-        Url::from_file_parts(
-            &host,
-            host_type,
-            &parsed[Position::BeforePath..Position::AfterFragment],
-        )
+        let parsed = Url::parse_with_url_base(&dummy, None)?;
+        Url::from_file_parts(&host, host_type, parsed.pathname_and_later())
     })())
 }
 
@@ -2156,27 +2264,23 @@ fn resolve_custom_file_base(input: &str, base: &Url) -> Option<Result<Url, Parse
     }
 
     Some((|| {
-        let dummy_base = BackendUrl::parse(&format!("file://{}", base.pathname_and_later()))
-            .map_err(|_| ParseError::new(ParseErrorKind::InvalidBase))?;
-        let mut parsed = BackendUrl::options()
-            .base_url(Some(&dummy_base))
-            .parse(input)
-            .map_err(|_| ParseError::new(ParseErrorKind::InvalidUrl))?;
-        normalize_file_drive_letter(&mut parsed);
+        let dummy_base = Url::from_file_parts("", HostType::Domain, base.pathname_and_later())?;
+        let parsed = Url::parse_with_url_base(input, Some(&dummy_base))?;
 
-        if parsed.scheme() != "file" || input_has_authority(input) {
-            return Url::from_backend(parsed);
+        if parsed.scheme_type != SchemeType::File || input_has_authority(input) {
+            return Ok(parsed);
         }
 
         let suffix = if input_path(input) == "/" {
             let root = &base.pathname()[..4];
-            format!(
-                "{}{}",
-                root,
-                &parsed[Position::AfterPath..Position::AfterFragment]
-            )
+            let later_start = parsed
+                .components
+                .search_start()
+                .or(parsed.components.hash_start())
+                .map_or(parsed.buffer.len(), |offset| offset as usize);
+            format!("{}{}", root, &parsed.buffer[later_start..])
         } else {
-            String::from(&parsed[Position::BeforePath..Position::AfterFragment])
+            String::from(parsed.pathname_and_later())
         };
         Url::from_file_parts(base.hostname(), base.host_type, &suffix)
     })())
@@ -2222,28 +2326,6 @@ fn input_has_authority(input: &str) -> bool {
 fn input_path(input: &str) -> &str {
     let end = memchr2(b'?', b'#', input.as_bytes()).unwrap_or(input.len());
     &input[..end]
-}
-
-fn resolve_file_root(input: &str, base: &mut BackendUrl) -> Option<BackendUrl> {
-    if input != "/" || base.scheme() != "file" {
-        return None;
-    }
-    let path = base.path().as_bytes();
-    let root = if path.len() >= 4
-        && path[0] == b'/'
-        && path[1].is_ascii_alphabetic()
-        && path[2] == b':'
-        && path[3] == b'/'
-    {
-        &base.path()[..4]
-    } else {
-        "/"
-    };
-    let root = String::from(root);
-    base.set_path(&root);
-    base.set_query(None);
-    base.set_fragment(None);
-    Some(base.clone())
 }
 
 #[cfg(test)]
@@ -2320,6 +2402,16 @@ mod tests {
         let before = url.clone();
         assert!(url.set_port(Some("99999")).is_err());
         assert_eq!(url, before);
+    }
+
+    #[cfg(all(feature = "std", unix))]
+    #[test]
+    fn converts_file_paths_without_a_url_backend() {
+        assert_eq!(
+            super::href_from_file("/tmp/a%20b\\c").unwrap(),
+            "file:///tmp/a%2520b%5Cc"
+        );
+        assert!(super::href_from_file("relative/path").is_err());
     }
 
     #[test]

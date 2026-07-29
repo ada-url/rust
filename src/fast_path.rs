@@ -1,5 +1,13 @@
 //! Conservative fast path for already-normalized HTTP(S) URLs.
 
+use crate::{
+    bytes::{find_byte as memchr, find_byte2 as memchr2, find_byte3 as memchr3},
+    components::{Components, HostType, SchemeType},
+    encoding::{
+        PercentEncodeSet, append_percent_encoded, percent_decode_utf8, utf8_percent_encode,
+    },
+    idna::domain_to_ascii,
+};
 use alloc::{
     borrow::Cow,
     format,
@@ -9,11 +17,6 @@ use core::{
     fmt::{self, Write},
     net::{Ipv4Addr, Ipv6Addr},
 };
-use memchr::{memchr, memchr2, memchr3};
-use percent_encoding::{AsciiSet, CONTROLS, percent_decode_str, utf8_percent_encode};
-
-use crate::components::{Components, HostType, SchemeType};
-use crate::idna::domain_to_ascii;
 
 pub(crate) struct FastPath {
     pub buffer: String,
@@ -355,30 +358,11 @@ const fn host_table() -> [u8; 256] {
 
 const HOST_TABLE: [u8; 256] = host_table();
 
-const PATH_ENCODE_SET: &AsciiSet = &CONTROLS
-    .add(b' ')
-    .add(b'"')
-    .add(b'#')
-    .add(b'<')
-    .add(b'>')
-    .add(b'?')
-    .add(b'^')
-    .add(b'`')
-    .add(b'{')
-    .add(b'}');
-const QUERY_ENCODE_SET: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>');
-const SPECIAL_QUERY_ENCODE_SET: &AsciiSet = &QUERY_ENCODE_SET.add(b'\'');
-const FRAGMENT_ENCODE_SET: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
-const USERINFO_ENCODE_SET: &AsciiSet = &PATH_ENCODE_SET
-    .add(b'/')
-    .add(b':')
-    .add(b';')
-    .add(b'=')
-    .add(b'@')
-    .add(b'[')
-    .add(b'\\')
-    .add(b']')
-    .add(b'|');
+const PATH_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::Path;
+const QUERY_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::Query;
+const SPECIAL_QUERY_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::SpecialQuery;
+const FRAGMENT_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::Fragment;
+const USERINFO_ENCODE_SET: PercentEncodeSet = PercentEncodeSet::UserInfo;
 
 #[inline]
 pub(crate) fn parse(input: &str) -> Option<FastPath> {
@@ -520,26 +504,14 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
     };
     let authority = &authority_tail[..authority_length];
     let rest = &authority_tail[authority_length..];
-    if authority.is_empty() {
-        return if special {
-            CommonParse::Invalid
-        } else {
-            CommonParse::Unsupported
-        };
-    }
-
     let (userinfo, host_port) = authority.rfind('@').map_or((None, authority), |index| {
         (Some(&authority[..index]), &authority[index + 1..])
     });
     let Some((raw_host, raw_port)) = split_host_port(host_port) else {
         return CommonParse::Invalid;
     };
-    if raw_host.is_empty() {
-        return if special {
-            CommonParse::Invalid
-        } else {
-            CommonParse::Unsupported
-        };
+    if raw_host.is_empty() && (special || !authority.is_empty()) {
+        return CommonParse::Invalid;
     }
 
     let (host, host_type): (Cow<'_, str>, HostType) = if let Some(address) = raw_host
@@ -563,7 +535,7 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
             if raw_host.is_ascii() && raw_host.bytes().all(|byte| byte > 0x1f && byte != 0x7f) {
                 Cow::Borrowed(raw_host)
             } else {
-                Cow::Owned(utf8_percent_encode(raw_host, CONTROLS).to_string())
+                Cow::Owned(utf8_percent_encode(raw_host, PercentEncodeSet::C0Control).to_string())
             };
         (host, HostType::Domain)
     };
@@ -609,11 +581,11 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
         if username.is_empty() && password.is_none_or(str::is_empty) {
             username_end = authority_offset;
         } else {
-            buffer.extend(utf8_percent_encode(username, USERINFO_ENCODE_SET));
+            append_percent_encoded(&mut buffer, username, USERINFO_ENCODE_SET);
             username_end = buffer.len();
             if let Some(password) = password.filter(|password| !password.is_empty()) {
                 buffer.push(':');
-                buffer.extend(utf8_percent_encode(password, USERINFO_ENCODE_SET));
+                append_percent_encoded(&mut buffer, password, USERINFO_ENCODE_SET);
             }
             buffer.push('@');
         }
@@ -641,13 +613,13 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
         } else {
             QUERY_ENCODE_SET
         };
-        buffer.extend(utf8_percent_encode(query, encode_set));
+        append_percent_encoded(&mut buffer, query, encode_set);
         start
     });
     let hash_start = fragment.map(|fragment| {
         let start = buffer.len();
         buffer.push('#');
-        buffer.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+        append_percent_encoded(&mut buffer, fragment, FRAGMENT_ENCODE_SET);
         start
     });
 
@@ -687,6 +659,80 @@ pub(crate) fn parse_common_absolute(input: &str) -> CommonParse {
     })
 }
 
+pub(crate) fn parse_non_special_hierarchical_absolute(input: &str) -> Option<FastPath> {
+    let colon = memchr(b':', input.as_bytes())?;
+    let scheme = &input[..colon];
+    if scheme.is_empty()
+        || !scheme.as_bytes()[0].is_ascii_alphabetic()
+        || !scheme
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.'))
+        || SchemeType::from_scheme(scheme).is_special()
+        || scheme.eq_ignore_ascii_case("file")
+    {
+        return None;
+    }
+    let rest = &input[colon + 1..];
+    if !rest.starts_with('/') || rest.starts_with("//") {
+        return None;
+    }
+    let (before_fragment, fragment) = rest.find('#').map_or((rest, None), |index| {
+        (&rest[..index], Some(&rest[index + 1..]))
+    });
+    let (path, query) = before_fragment
+        .find('?')
+        .map_or((before_fragment, None), |index| {
+            (
+                &before_fragment[..index],
+                Some(&before_fragment[index + 1..]),
+            )
+        });
+
+    let mut buffer = String::with_capacity(input.len() + 8);
+    for byte in scheme.bytes() {
+        buffer.push(char::from(byte.to_ascii_lowercase()));
+    }
+    buffer.push(':');
+    let protocol_end = buffer.len();
+    let mut normalized_path = String::with_capacity(path.len());
+    append_normalized_path(&mut normalized_path, path);
+    if normalized_path.starts_with("//") {
+        buffer.push_str("/.");
+    }
+    let pathname_start = buffer.len();
+    buffer.push_str(&normalized_path);
+    let search_start = query.map(|query| {
+        let start = buffer.len();
+        buffer.push('?');
+        append_percent_encoded(&mut buffer, query, QUERY_ENCODE_SET);
+        start
+    });
+    let hash_start = fragment.map(|fragment| {
+        let start = buffer.len();
+        buffer.push('#');
+        append_percent_encoded(&mut buffer, fragment, FRAGMENT_ENCODE_SET);
+        start
+    });
+    let components = Components::new(
+        u32::try_from(protocol_end).ok()?,
+        u32::try_from(protocol_end).ok()?,
+        u32::try_from(protocol_end).ok()?,
+        u32::try_from(protocol_end).ok()?,
+        None,
+        u32::try_from(pathname_start).ok()?,
+        search_start.map(u32::try_from).transpose().ok()?,
+        hash_start.map(u32::try_from).transpose().ok()?,
+    );
+    Some(FastPath {
+        buffer,
+        components,
+        scheme_type: SchemeType::NotSpecial,
+        host_type: HostType::Domain,
+        has_authority: false,
+        opaque_path: false,
+    })
+}
+
 pub(crate) fn normalize_special_host(raw_host: &str) -> Option<(String, HostType)> {
     if raw_host.is_empty() {
         return None;
@@ -711,7 +757,7 @@ pub(crate) fn normalize_special_host(raw_host: &str) -> Option<(String, HostType
         }
     }
 
-    let decoded = percent_decode_str(raw_host).decode_utf8().ok()?;
+    let decoded = percent_decode_utf8(raw_host)?;
     let ascii_host = domain_to_ascii(&decoded).ok()?;
     if ascii_host.is_empty() {
         return None;
@@ -794,20 +840,20 @@ pub(crate) fn parse_opaque_absolute(input: &str) -> Option<FastPath> {
     buffer.push(':');
     let protocol_end = buffer.len();
     let pathname_start = protocol_end;
-    buffer.extend(utf8_percent_encode(raw_path, CONTROLS));
+    append_percent_encoded(&mut buffer, raw_path, PercentEncodeSet::C0Control);
     if encode_final_space {
         buffer.push_str("%20");
     }
     let search_start = query.map(|query| {
         let start = buffer.len();
         buffer.push('?');
-        buffer.extend(utf8_percent_encode(query, QUERY_ENCODE_SET));
+        append_percent_encoded(&mut buffer, query, QUERY_ENCODE_SET);
         start
     });
     let hash_start = fragment.map(|fragment| {
         let start = buffer.len();
         buffer.push('#');
-        buffer.extend(utf8_percent_encode(fragment, FRAGMENT_ENCODE_SET));
+        append_percent_encoded(&mut buffer, fragment, FRAGMENT_ENCODE_SET);
         start
     });
     let components = Components::new(
@@ -1135,7 +1181,7 @@ fn append_normalized_path(buffer: &mut String, raw_path: &str) {
         if has_segment {
             buffer.push('/');
         }
-        buffer.extend(utf8_percent_encode(segment, PATH_ENCODE_SET));
+        append_percent_encoded(buffer, segment, PATH_ENCODE_SET);
         has_segment = true;
     }
 }

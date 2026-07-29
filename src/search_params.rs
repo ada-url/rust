@@ -6,7 +6,11 @@ use core::{
     hash::{Hash, Hasher},
 };
 
-use crate::ParseUrlError;
+use crate::{
+    ParseUrlError,
+    bytes::{find_byte, find_byte2},
+    encoding::append_form_component,
+};
 
 const INLINE_CAPACITY: usize = 22;
 const INVALID_HEX: u8 = u8::MAX;
@@ -105,16 +109,14 @@ impl UrlSearchParams {
     pub fn new(input: &str) -> Self {
         let input = input.strip_prefix('?').unwrap_or(input);
         let bytes = input.as_bytes();
-        let capacity = usize::from(!bytes.is_empty()) + memchr::memchr_iter(b'&', bytes).count();
+        let capacity =
+            usize::from(!bytes.is_empty()) + bytes.iter().filter(|byte| **byte == b'&').count();
         let mut pairs = Vec::with_capacity(capacity);
-        let mut sequence_start = 0_usize;
-        for sequence_end in memchr::memchr_iter(b'&', bytes).chain(core::iter::once(bytes.len())) {
-            let sequence = &bytes[sequence_start..sequence_end];
-            sequence_start = sequence_end.saturating_add(1);
+        for sequence in bytes.split(|byte| *byte == b'&') {
             if sequence.is_empty() {
                 continue;
             }
-            let equals = memchr::memchr(b'=', sequence);
+            let equals = find_byte(b'=', sequence);
             let (name, value) = equals.map_or((sequence, &[][..]), |index| {
                 (&sequence[..index], &sequence[index + 1..])
             });
@@ -303,7 +305,7 @@ impl UrlSearchParams {
 
 #[inline]
 fn decode_form_component(input: &[u8]) -> ParamString {
-    let first_escape = memchr::memchr2(b'%', b'+', input);
+    let first_escape = find_byte2(b'%', b'+', input);
     let Some(first_escape) = first_escape else {
         // `input` is a subslice of a valid UTF-8 string split only at ASCII
         // delimiters, so it is itself valid UTF-8.
@@ -335,7 +337,7 @@ fn decode_form_component(input: &[u8]) -> ParamString {
             }
             _ => {
                 let run_length =
-                    memchr::memchr2(b'%', b'+', &input[index..]).unwrap_or(input.len() - index);
+                    find_byte2(b'%', b'+', &input[index..]).unwrap_or(input.len() - index);
                 decoded.extend_from_slice(&input[index..index + run_length]);
                 index += run_length;
             }
@@ -350,9 +352,21 @@ fn decode_form_component(input: &[u8]) -> ParamString {
 
 impl fmt::Display for UrlSearchParams {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut serializer = url::form_urlencoded::Serializer::new(String::new());
-        serializer.extend_pairs(self.iter());
-        formatter.write_str(&serializer.finish())
+        let estimated = self
+            .pairs
+            .iter()
+            .map(|(name, value)| name.as_str().len() + value.as_str().len() + 2)
+            .sum();
+        let mut output = String::with_capacity(estimated);
+        for (index, (name, value)) in self.iter().enumerate() {
+            if index != 0 {
+                output.push('&');
+            }
+            append_form_component(&mut output, name);
+            output.push('=');
+            append_form_component(&mut output, value);
+        }
+        formatter.write_str(&output)
     }
 }
 

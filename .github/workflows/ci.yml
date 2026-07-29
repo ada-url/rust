@@ -37,10 +37,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install Wasm runtime
+      - name: Install Wasm deps
         if: matrix.env.CARGO_BUILD_TARGET == 'wasm32-wasip1'
         run: |
           rustup target add wasm32-wasip1
+          curl -LO https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-33/wasi-sdk-33.0-x86_64-linux.deb
+          sudo dpkg --install wasi-sdk-33.0-x86_64-linux.deb
           curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v46.0.1/wasmtime-v46.0.1-x86_64-linux.tar.xz
           tar xvf wasmtime-v46.0.1-x86_64-linux.tar.xz
           echo "$PWD/wasmtime-v46.0.1-x86_64-linux" >> "$GITHUB_PATH"
@@ -65,6 +67,24 @@ jobs:
         env:
           RUSTDOCFLAGS: '-D warnings'
         run: cargo hack doc --feature-powerset --locked
+
+  feature-modes:
+    name: no_std and optional features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: feature-modes
+          save-if: ${{ github.ref_name == 'main' }}
+
+      - run: rustup show
+
+      - name: Test dependency-free core and Serde integration
+        run: |
+          cargo test --no-default-features --locked
+          cargo test --no-default-features --features serde --locked
 
   sanitizers:
     name: AddressSanitizer + LeakSanitizer
@@ -125,6 +145,8 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      # rust-toolchain.toml pins stable, so select nightly explicitly.
+      # Miri interprets Rust MIR to catch undefined behavior that normal tests
+      # cannot reliably observe. rust-toolchain.toml pins stable, so select
+      # nightly explicitly.
       - run: cargo +nightly miri setup
       - run: cargo +nightly miri test --lib --no-default-features
