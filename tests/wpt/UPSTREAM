@@ -1,0 +1,17 @@
+Repository: https://github.com/ada-url/ada
+Commit: 30f3f3020c5a979b62f90dc9c37fd45de3cc84d7
+Files:
+- tests/wpt/urltestdata.json
+- tests/wpt/ada_extra_urltestdata.json
+- tests/wpt/ada_long_urltestdata.json
+- tests/wpt/setters_tests.json
+- tests/wpt/ada_extra_setters_tests.json
+- tests/wpt/toascii.json
+- tests/wpt/IdnaTestV2.json
+- tests/wpt/IdnaTestV2-removed.json
+- tests/wpt/percent-encoding.json
+- tests/wpt/urltestdata-javascript-only.json
+- tests/wpt/verifydnslength_tests.json
+- tests/wpt/urlpatterntestdata.json
+- tests/wpt/urlpattern-compare-test-data.json
+- tests/wpt/urlpattern-generate-test-data.json

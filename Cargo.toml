@@ -4,7 +4,8 @@ authors = [
    "Yagiz Nizipli <yagiz@nizipli.com>",
    "Daniel Lemire <daniel@lemire.me>",
    "LongYinan <github@lyn.one>",
-   "Boshen <boshenc@gmail.com>"
+   "Boshen <boshenc@gmail.com>",
+   "Diaconu Radu-Mihai <52667211+countradooku@users.noreply.github.com>"
  ]
 version = "4.0.0"
 edition = "2024"
@@ -16,7 +17,6 @@ categories = ["parser-implementations", "web-programming", "encoding", "parsing"
 repository = "https://github.com/ada-url/rust"
 homepage = "https://ada-url.com"
 license = "MIT OR Apache-2.0"
-links = "ada-url"
 
 [[bench]]
 name = "parse"
@@ -49,34 +49,32 @@ path = "bench/wpt.rs"
 harness = false
 
 [features]
-default = ["bundled", "std"]
-# compile and statically link the bundled C++ `ada` sources. Enabled by
-# default; disable (`default-features = false`) to link an externally provided
-# ada instead (see `ADA_LIB_DIR` / `ADA_LIB_NAME` in build.rs).
+default = ["std"]
+# Kept as no-op compatibility features for downstream manifests which selected
+# the former C++ implementation's build modes.
 bundled = []
-# pass `cpp_set_stdlib("c++")` to `cc`
 libcpp = []
 # enables serde serialization/deserialization support
 serde = ["dep:serde", "std"]
 # enable allocations
-std = []
+std = ["url/std"]
+url-pattern = ["dep:urlpattern", "std"]
 
 [dependencies]
+idna = "1.1.0"
+memchr = "2.8.0"
+percent-encoding = "2.3.2"
 serde = { version = "1", optional = true, features = ["derive"] }
+url = { version = "2.5.8", default-features = false }
+urlpattern = { version = "0.6.0", optional = true }
 
 [dev-dependencies]
 criterion = { package = "codspeed-criterion-compat", version = "4", default-features = false, features = ["cargo_bench_support"] }
-url = "2" # Used by benchmarks
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-[build-dependencies]
-cc = { version = "1.2", features = ["parallel"] }
-link_args = "0.6"
-regex = { version = "1.11", features = [] }
-
 [package.metadata.docs.rs]
-features = ["serde"]
+features = ["serde", "url-pattern"]
 
 [package.metadata.playground]
 features = ["serde"]

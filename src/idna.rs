@@ -1,63 +1,59 @@
-#[cfg(feature = "std")]
-extern crate std;
+//! UTS #46 domain conversion helpers.
 
-#[cfg_attr(not(feature = "std"), allow(unused_imports))]
-use crate::ffi;
+use alloc::string::String;
 
-#[cfg(feature = "std")]
-use std::string::String;
-
-/// IDNA struct implements the `to_ascii` and `to_unicode` functions from the Unicode Technical
-/// Standard supporting a wide range of systems. It is suitable for URL parsing.
-/// For more information, [read the specification](https://www.unicode.org/reports/tr46/#ToUnicode)
-pub struct Idna {}
+/// UTS #46 conversion helpers retained for API compatibility.
+pub struct Idna;
 
 impl Idna {
-    /// Process international domains according to the UTS #46 standard.
-    /// Returns empty string if the input is invalid.
-    ///
-    /// For more information, [read the specification](https://www.unicode.org/reports/tr46/#ToUnicode)
-    ///
-    /// ```
-    /// use ada_url::Idna;
-    /// assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca"), "meßagefactory.ca");
-    /// ```
+    /// Converts an ASCII/Punycode domain to Unicode.
     #[must_use]
-    #[cfg(feature = "std")]
     pub fn unicode(input: &str) -> String {
-        unsafe { ffi::ada_idna_to_unicode(input.as_ptr().cast(), input.len()) }.to_string()
+        domain_to_unicode(input).0
     }
 
-    /// Process international domains according to the UTS #46 standard.
-    /// Returns empty string if the input is invalid.
-    ///
-    /// For more information, [read the specification](https://www.unicode.org/reports/tr46/#ToASCII)
-    ///
-    /// ```
-    /// use ada_url::Idna;
-    /// assert_eq!(Idna::ascii("meßagefactory.ca"), "xn--meagefactory-m9a.ca");
-    /// ```
+    /// Converts a Unicode domain to ASCII, returning an empty string on error.
     #[must_use]
-    #[cfg(feature = "std")]
     pub fn ascii(input: &str) -> String {
-        unsafe { ffi::ada_idna_to_ascii(input.as_ptr().cast(), input.len()) }.to_string()
+        domain_to_ascii(input).unwrap_or_default()
     }
 }
 
-#[cfg(test)]
-mod tests {
-    #[cfg_attr(not(feature = "std"), allow(unused_imports))]
-    use crate::idna::*;
-
-    #[test]
-    fn unicode_should_work() {
-        #[cfg(feature = "std")]
-        assert_eq!(Idna::unicode("xn--meagefactory-m9a.ca"), "meßagefactory.ca");
+/// Converts a Unicode domain to its ASCII form using UTS #46 processing.
+pub fn domain_to_ascii(domain: &str) -> Result<String, idna::Errors> {
+    let converted = idna::domain_to_ascii_cow(domain.as_bytes(), idna::AsciiDenyList::URL)
+        .map(|domain| domain.into_owned());
+    if converted.is_err() && domain.is_ascii() && !domain.bytes().any(is_forbidden_domain_byte) {
+        // The URL Standard deliberately preserves some ASCII labels that fail
+        // strict UTS #46 validity checks (for example an invalid A-label).
+        // Mapping is still required, so ASCII case is folded.
+        return Ok(domain.to_ascii_lowercase());
     }
+    converted
+}
 
-    #[test]
-    fn ascii_should_work() {
-        #[cfg(feature = "std")]
-        assert_eq!(Idna::ascii("meßagefactory.ca"), "xn--meagefactory-m9a.ca");
-    }
+/// Converts an ASCII/Punycode domain to Unicode.
+pub fn domain_to_unicode(domain: &str) -> (String, Result<(), idna::Errors>) {
+    idna::domain_to_unicode(domain)
+}
+
+fn is_forbidden_domain_byte(byte: u8) -> bool {
+    matches!(
+        byte,
+        0x00..=0x20
+            | 0x7f
+            | b'#'
+            | b'%'
+            | b'/'
+            | b':'
+            | b'<'
+            | b'>'
+            | b'?'
+            | b'@'
+            | b'['
+            | b'\\'
+            | b']'
+            | b'^'
+            | b'|'
+    )
 }
