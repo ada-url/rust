@@ -88,15 +88,12 @@ pub fn wpt_bench_ada_url(c: &mut Criterion) {
                 let parsed = if !base.is_empty() {
                     match Url::parse(black_box(base.as_str()), None) {
                         Ok(base_url) => {
-                            // Pass the base URL's href string as the base for input parsing.
-                            // This is equivalent to using a pre-parsed base pointer in C++.
-                            let base_href = base_url.href().to_owned();
-                            Url::parse(black_box(input.as_str()), Some(&base_href))
+                            Url::parse_with_url_base(black_box(input.as_str()), Some(&base_url))
                         }
                         Err(_) => continue,
                     }
                 } else {
-                    Url::parse(black_box(input.as_str()), None)
+                    Url::parse_with_url_base(black_box(input.as_str()), None)
                 };
                 if let Ok(url) = parsed {
                     href_size += url.href().len();

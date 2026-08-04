@@ -44,7 +44,7 @@ jobs:
         sudo dpkg --install wasi-sdk-33.0-x86_64-linux.deb
         curl -LO https://github.com/bytecodealliance/wasmtime/releases/download/v46.0.1/wasmtime-v46.0.1-x86_64-linux.tar.xz
         tar xvf wasmtime-v46.0.1-x86_64-linux.tar.xz
-        echo `pwd`/wasmtime-v46.0.1-x86_64-linux >> $GITHUB_PATH
+        echo "$PWD/wasmtime-v46.0.1-x86_64-linux" >> "$GITHUB_PATH"
 
     - uses: Swatinem/rust-cache@v2
       with:
@@ -57,15 +57,15 @@ jobs:
       uses: taiki-e/install-action@cargo-hack
 
     - name: Clippy
-      run: cargo hack clippy --feature-powerset -- -D warnings
+      run: cargo hack clippy --feature-powerset --locked -- -D warnings
 
     - name: Test
-      run: cargo hack test --feature-powerset
+      run: cargo hack test --feature-powerset --locked
 
     - name: Check Documentation
       env:
         RUSTDOCFLAGS: '-D warnings'
-      run: cargo hack doc --feature-powerset
+      run: cargo hack doc --feature-powerset --locked
 
     - name: Check semver
       if: matrix.os == 'ubuntu-latest'

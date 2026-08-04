@@ -1,10 +1,13 @@
 # WHATWG URL parser for Rust
 
-Fast [WHATWG URL Specification](https://url.spec.whatwg.org) compliant URL parser for Rust.
-Well-tested and widely used by Node.js since [Node 18](https://nodejs.org/en/blog/release/v18.17.0).
+Fast, memory-safe [WHATWG URL Specification](https://url.spec.whatwg.org)
+compliant URL parser for Rust. The parser is implemented in Rust and keeps
+unsafe code confined to audited, bounds-checked SIMD byte-search kernels.
 
-The Ada library passes the full range of tests from the specification, across a wide range of platforms (e.g., Windows, Linux, macOS).
-It fully supports the relevant [Unicode Technical Standard](https://www.unicode.org/reports/tr46/#ToUnicode).
+The crate runs Ada's current URL, setter, IDNA, percent-encoding, and DNS-length
+conformance fixtures. It supports the relevant
+[Unicode Technical Standard](https://www.unicode.org/reports/tr46/#ToUnicode)
+through UTS #46 processing.
 
 ## Usage
 
@@ -14,67 +17,28 @@ Feel free to adjust it for exploring this crate further.
 
 ### Features
 
-**std:** Functionalities that require `std`.
-This feature is enabled by default, set `no-default-features` to `true` if you want `no-std`.
+**std:** Enables standard-library integrations. This feature is enabled by
+default; set `default-features = false` for `no_std` plus `alloc`.
 
-**serde:** Allow `Url` to work with `serde`. This feature is disabled by default. Enabling this feature without `std` would provide you only `Serialize`.
-Enabling this feature and `std` would provide you both `Serialize` and `Deserialize`.
+**serde:** Implements `Serialize` and `Deserialize` for `Url` and
+`UrlSearchParams`. This feature is disabled by default and enables `std`.
 
-**libcpp:** Build `ada-url` with `libc++`. This feature is disabled by default.
-Enabling this feature without `libc++` installed would cause compile error.
-
-**bundled:** Compile and statically link the bundled C++ `ada` sources. This
-feature is **enabled by default**. See "Linking against an external ada" below
-for how to disable it.
-
-### Linking against an external ada
-
-By default (the `bundled` feature) the build script compiles the bundled C++
-`ada` sources and links them statically. If ada is already provided by your
-host build system (e.g. Bazel, CMake, or a distribution package), compiling the
-bundled copy would produce a second, duplicate copy of ada in the final binary.
-
-Disable the `bundled` feature to skip the bundled build and link against an
-external ada instead:
-
-```toml
-# Cargo.toml — re-enable `std` since disabling default features also drops it
-ada-url = { version = "4", default-features = false, features = ["std"] }
-```
-
-When `bundled` is disabled, these optional environment variables configure how
-the external ada is linked:
-
-| Variable      | Description                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------- |
-| `ADA_LIB_DIR` | Optional directory added to the linker search path (`cargo:rustc-link-search=native`).             |
-| `ADA_LIB_NAME`| Optional library to link, passed verbatim to `cargo:rustc-link-lib` (e.g. `ada` or `static=ada`).  |
-
-If neither is provided, no link directive is emitted, leaving it to the host
-build system to provide the ada symbols at final link time. The external ada
-must expose the same C ABI (`ada_*`) and be ABI-compatible with this crate's
-version.
-
-```sh
-# Link against a system-installed libada in /usr/local/lib
-ADA_LIB_DIR=/usr/local/lib ADA_LIB_NAME=ada \
-  cargo build --no-default-features --features std
-```
+The former `bundled` and `libcpp` feature names remain as no-ops so existing
+downstream manifests continue to resolve after the move away from the C++ build.
 
 ### Performance
 
-Ada is fast. The benchmark below shows **3.49 times** faster URL parsing compared to `url`
+The parser uses a single normalized buffer with compact component offsets,
+plus conservative fast paths for common normalized URLs. Run the included
+Criterion comparisons against the `url` crate with:
 
-```text
-can_parse/ada_url       time:   [1.2109 µs 1.2121 µs 1.2133 µs]
-                        thrpt:  [635.09 MiB/s 635.75 MiB/s 636.38 MiB/s]
-
-parse/ada_url           time:   [2.0124 µs 2.0157 µs 2.0190 µs]
-                        thrpt:  [381.67 MiB/s 382.28 MiB/s 382.91 MiB/s]
-
-parse/url               time:   [7.0530 µs 7.0597 µs 7.0666 µs]
-                        thrpt:  [109.04 MiB/s 109.15 MiB/s 109.25 MiB/s]
+```sh
+cargo bench --bench parse
+cargo bench --bench wpt
 ```
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for storage invariants,
+fallback boundaries, and the performance policy.
 
 ### Implemented traits
 
@@ -110,7 +74,7 @@ just all
 **Skipping features:**
 
 ```sh
-just all --skip=libcpp,serde
+just all --skip=serde
 ```
 
 ## License
