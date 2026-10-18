@@ -27,11 +27,7 @@ pub fn url_search_params_bench(c: &mut Criterion) {
                 if let Ok(parsed) = Url::parse(black_box(url), None) {
                     let search = parsed.search();
                     // Strip leading '?' if present, matching C++ url->get_search() behavior
-                    let search_str = if search.starts_with('?') {
-                        &search[1..]
-                    } else {
-                        search
-                    };
+                    let search_str = search.strip_prefix('?').unwrap_or(search);
                     if let Ok(params) = UrlSearchParams::parse(search_str) {
                         param_count += params.len();
                     }

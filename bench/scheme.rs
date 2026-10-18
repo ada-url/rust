@@ -128,7 +128,7 @@ pub fn bench_scheme_naive(c: &mut Criterion) {
         b.iter(|| {
             let mut count = 0usize;
             for &s in &strings {
-                if hash_map.get(black_box(s)).is_some() {
+                if hash_map.contains_key(black_box(s)) {
                     count += 1;
                 }
             }
@@ -152,7 +152,7 @@ pub fn bench_scheme_naive(c: &mut Criterion) {
         b.iter(|| {
             let mut count = 0usize;
             for &s in &strings {
-                if btree_map.get(black_box(s)).is_some() {
+                if btree_map.contains_key(black_box(s)) {
                     count += 1;
                 }
             }
