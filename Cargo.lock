@@ -8,6 +8,7 @@ version = "4.0.0"
 dependencies = [
  "cc",
  "codspeed-criterion-compat",
+ "idna",
  "link_args",
  "regex",
  "serde",
