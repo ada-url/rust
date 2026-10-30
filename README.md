@@ -76,6 +76,25 @@ parse/url               time:   [7.0530 µs 7.0597 µs 7.0666 µs]
                         thrpt:  [109.04 MiB/s 109.15 MiB/s 109.25 MiB/s]
 ```
 
+IDNA conversion is compared against the [`idna`](https://crates.io/crates/idna) crate on a mixed set of international domain names (`cargo bench --bench idna`):
+
+```text
+IdnaBench_ToASCII/ada_url
+                        time:   [3.7099 µs 3.7498 µs 3.7804 µs]
+                        thrpt:  [56.256 MiB/s 56.715 MiB/s 57.325 MiB/s]
+
+IdnaBench_ToASCII/idna   time:   [2.7881 µs 2.7918 µs 2.7962 µs]
+                        thrpt:  [76.058 MiB/s 76.177 MiB/s 76.279 MiB/s]
+
+IdnaBench_ToUnicode/ada_url
+                        time:   [2.7004 µs 2.7056 µs 2.7112 µs]
+                        thrpt:  [78.440 MiB/s 78.604 MiB/s 78.755 MiB/s]
+
+IdnaBench_ToUnicode/idna
+                        time:   [2.5586 µs 2.5631 µs 2.5685 µs]
+                        thrpt:  [82.799 MiB/s 82.973 MiB/s 83.120 MiB/s]
+```
+
 ### Implemented traits
 
 `Url` implements the following traits.
